@@ -1,3 +1,5 @@
+import ctypes
+import json
 import os
 import re
 import subprocess
@@ -28,24 +30,55 @@ def can_update(game_path):
 SETTLE_SECONDS = 10 * 60
 
 
-def detect_game_exe():
-    """find the league install from the riot client's own metadata"""
-    meta = os.path.join(os.environ.get('PROGRAMDATA', r'C:\ProgramData'), 'Riot Games', 'Metadata',
-                        'league_of_legends.live', 'league_of_legends.live.product_settings.yaml')
-    candidates = []
+def _install_roots():
+    """league folders according to riot, windows, and the usual spots"""
+    riot = os.path.join(os.environ.get('PROGRAMDATA', r'C:\ProgramData'), 'Riot Games')
     try:
-        with open(meta, encoding='utf-8') as f:
+        with open(os.path.join(riot, 'Metadata', 'league_of_legends.live',
+                               'league_of_legends.live.product_settings.yaml'), encoding='utf-8') as f:
             m = re.search(r'^product_install_full_path:\s*"?([^"\r\n]+)"?', f.read(), re.M)
         if m:
-            candidates.append(os.path.join(m.group(1), 'Game', GameParser.executable_name))
+            yield m.group(1)
     except OSError:
         pass
-    candidates.append(os.path.join(r'C:\Riot Games\League of Legends\Game', GameParser.executable_name))
-    for c in candidates:
-        c = os.path.normpath(c)
-        if os.path.isfile(c):
-            return c
-    return None
+    try:
+        with open(os.path.join(riot, 'RiotClientInstalls.json'), encoding='utf-8') as f:
+            yield from (p for p in json.load(f).get('associated_client', {}) if 'league of legends' in p.lower())
+    except (OSError, ValueError, AttributeError):
+        pass
+    import winreg
+    key = r'Software\Microsoft\Windows\CurrentVersion\Uninstall\Riot Game league_of_legends.live'
+    for hive in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+        try:
+            with winreg.OpenKey(hive, key) as k:
+                yield winreg.QueryValueEx(k, 'InstallLocation')[0]
+        except OSError:
+            pass
+    # fixed drives only, a disconnected network drive would hang this for ages
+    drives = ctypes.windll.kernel32.GetLogicalDrives()
+    for i in range(26):
+        root = f'{chr(65 + i)}:\\'
+        if drives >> i & 1 and ctypes.windll.kernel32.GetDriveTypeW(root) == 3:
+            yield os.path.join(root, 'Riot Games', 'League of Legends')
+
+
+def detect_game_exes():
+    """every live league install on this pc, best guess first. pbe is skipped, nobody wants those patches"""
+    found, seen = [], set()
+    for root in _install_roots():
+        root = os.path.normpath(root)
+        if 'pbe' in os.path.basename(root).lower():
+            continue
+        exe = os.path.join(root, 'Game', GameParser.executable_name)
+        if os.path.normcase(exe) not in seen and os.path.isfile(exe):
+            seen.add(os.path.normcase(exe))
+            found.append(exe)
+    return found
+
+
+def detect_game_exe():
+    found = detect_game_exes()
+    return found[0] if found else None
 
 
 def _install_stamp(directory):

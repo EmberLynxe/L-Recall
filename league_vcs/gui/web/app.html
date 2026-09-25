@@ -404,7 +404,8 @@ tr.me .pl-n { color: var(--gold); }
     <div class="lead">Two things to set before your replays can be played on their original patch.</div>
     <div class="fld">
       <label>League of Legends.exe</label>
-      <div class="inl"><div class="path unset" id="su-game">Not selected</div><button class="btn" onclick="pickSuGame()">Browse</button></div>
+      <div class="inl"><div class="path unset" id="su-game">Looking for League...</div><button class="btn" onclick="pickSuGame()">Browse</button></div>
+      <div class="hint" id="su-game-hint"></div>
     </div>
     <div class="fld">
       <label>Patch storage folder</label>
@@ -500,7 +501,7 @@ tr.me .pl-n { color: var(--gold); }
           <div><h3>Game installs</h3><p>Checked hourly. New patches are stored after the client finishes updating.</p></div>
           <div>
             <div class="plist" id="gp-list"></div>
-            <div class="inl"><button class="btn" onclick="addGP()">Add...</button><button class="btn" id="rm-gp-btn" disabled onclick="rmGP()">Remove</button></div>
+            <div class="inl"><button class="btn" onclick="findGP()" title="Look for League installs on this PC">Find</button><button class="btn" onclick="addGP()">Add...</button><button class="btn" id="rm-gp-btn" disabled onclick="rmGP()">Remove</button></div>
           </div>
         </div>
         <div class="frow">
@@ -706,7 +707,7 @@ async function init() {
   try {
     const info = await call('init');
     config = info.config || {};
-    if (!info.configured) $('setup-view').classList.add('on');
+    if (!info.configured) { $('setup-view').classList.add('on'); detectSuGame(); }
     else showApp();
   } catch (e) {
     document.body.innerHTML = '<div style="padding:24px;color:#e3545e;font:13px Consolas,monospace">Couldn\'t start: ' + esc(e.message) + '</div>';
@@ -729,10 +730,22 @@ async function showApp() {
 
 // setup
 let suGame = null, suRepo = null;
+function setSuGame(p, hint) {
+  if (p) { suGame = p; $('su-game').textContent = p; $('su-game').classList.remove('unset'); }
+  else if (!suGame) $('su-game').textContent = 'Not selected';
+  $('su-game-hint').textContent = hint || '';
+  $('su-save').disabled = !(suGame && suRepo);
+}
+async function detectSuGame() {
+  let p = null;
+  try { p = await call('detect_game'); } catch (e) {}
+  if (suGame) return;
+  setSuGame(p, p ? 'Found automatically. Browse if that\'s the wrong install.'
+    : 'Couldn\'t find League. Pick League of Legends.exe in the Game folder of your League install.');
+}
 async function pickSuGame() {
   const p = await call('pick_file', { title: 'Select League of Legends.exe', wildcard: 'League of Legends.exe|League of Legends.exe' });
-  if (p) { suGame = p; $('su-game').textContent = p; $('su-game').classList.remove('unset'); }
-  $('su-save').disabled = !(suGame && suRepo);
+  if (p) setSuGame(p);
 }
 async function pickSuRepo() {
   const p = await call('pick_directory', { title: 'Choose where to store patches' });
@@ -1598,6 +1611,11 @@ async function addFolder() {
 async function rmFolder() {
   if (selFI < 0) return;
   await call('remove_replay_folder', { index: selFI }); await loadSettings(); loadR();
+}
+async function findGP() {
+  const n = await call('find_game_paths');
+  toast(n ? 'Found ' + plural(n, 'install') : 'Nothing new found');
+  if (n) loadSettings();
 }
 async function addGP() {
   const p = await call('pick_file', { title: 'Select League of Legends.exe', wildcard: 'League of Legends.exe|League of Legends.exe' });

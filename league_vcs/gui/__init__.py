@@ -76,7 +76,9 @@ class GUI:
         self.app.MainLoop()
 
     def start_daemon(self):
-        if not self.config.get('game_paths'):
+        # nothing set, or league got moved/reinstalled somewhere else. go find it
+        paths = self.config.get('game_paths') or []
+        if not any(os.path.isfile(p) for p in paths):
             exe = core.detect_game_exe()
             if exe:
                 self.config['game_paths'] = [exe]

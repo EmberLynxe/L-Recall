@@ -367,6 +367,18 @@ class SettingsFrame(CallbackFrame):
             self.config.save()
         self._respond(req_id, True)
 
+    def _handle_detect_game(self, req_id, _msg):
+        self._respond(req_id, core.detect_game_exe())
+
+    def _handle_find_game_paths(self, req_id, _msg):
+        paths = self.config.get('game_paths', [])
+        have = {os.path.normcase(p) for p in paths}
+        new = [p for p in core.detect_game_exes() if os.path.normcase(p) not in have]
+        if new:
+            self.config['game_paths'] = paths + new
+            self.config.save()
+        self._respond(req_id, len(new))
+
     def _handle_remove_game_path(self, req_id, msg):
         idx = msg.get('index', -1)
         paths = self.config.get('game_paths', [])

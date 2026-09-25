@@ -77,6 +77,25 @@ class SigningTest(TempDirTest):
             self.assertIn('Riot', signing.check_game_folder(folder, 'League of Legends.exe'))
 
 
+class DetectTest(TempDirTest):
+    def test_finds_live_installs_once_and_skips_pbe(self):
+        roots = []
+        for name in ('League of Legends', 'League of Legends (PBE)', 'Not League'):
+            root = os.path.join(self.tmp, name)
+            roots.append(root)
+            if name != 'Not League':
+                os.makedirs(os.path.join(root, 'Game'))
+                open(os.path.join(root, 'Game', 'League of Legends.exe'), 'w').close()
+        live = os.path.join(roots[0], 'Game', 'League of Legends.exe')
+        # riot's files use forward slashes and trailing ones, same install shows up a few times
+        seen = [roots[0].replace('\\', '/') + '/', roots[1], roots[0], roots[2]]
+        with mock.patch.object(core, '_install_roots', return_value=iter(seen)):
+            self.assertEqual(core.detect_game_exes(), [os.path.normpath(live)])
+
+    def test_real_lookup_doesnt_blow_up(self):
+        self.assertIsInstance(core.detect_game_exes(), list)
+
+
 class ConfigTest(TempDirTest):
     def test_corrupt_config_is_set_aside(self):
         path = os.path.join(self.tmp, 'user_settings.json')

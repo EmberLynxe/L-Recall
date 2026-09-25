@@ -95,6 +95,8 @@ class InitialConfigFrame(Frame):
                     'configured': False,
                     'config': dict(self.config),
                 })
+            elif action == 'detect_game':
+                self._respond(req_id, core.detect_game_exe())
             elif action == 'pick_file':
                 def _pick():
                     dlg = wx.FileDialog(self, msg.get('title', ''),
