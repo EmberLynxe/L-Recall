@@ -126,9 +126,8 @@ def needs_vanguard(version):
 def vanguard_preflight(version, warn_old=True):
     """(level, message), or (None, None) if we're good.
 
-    14.9+ won't even start without vanguard. older ones don't need it, and running them
-    with vanguard on is untested, so we can warn about that. every fix we suggest is riot's
-    own way of doing it, we never touch vanguard ourselves"""
+    14.9+ won't start without vanguard. older ones don't need it, and running them with
+    vanguard on is untested, so we can warn about that"""
     from league_vcs import vanguard
     st = vanguard.status()
     new = needs_vanguard(version)

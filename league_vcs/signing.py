@@ -1,7 +1,4 @@
-"""checks the game exe is actually riot's before we run it.
-
-storage is just files on disk. if someone hands you their storage folder, the exe in it
-is whatever they put there, so it has to carry a valid signature from riot"""
+"""make sure the game files are riot's before we run anything out of storage"""
 import ctypes
 import os
 import threading
@@ -60,8 +57,8 @@ _crypt32.CertGetNameStringW.restype = wintypes.DWORD
 
 
 def signer(path):
-    """name on a valid signature, or None if it's unsigned, tampered with or doesn't check out.
-    no network. old patches have expired certs but they're timestamped, so they still pass"""
+    """name on a valid signature, else None. offline. old patches have expired certs but
+    they're timestamped so they still pass"""
     info = _FileInfo(ctypes.sizeof(_FileInfo), os.path.abspath(path), None, None)
     data = _TrustData()
     data.cbStruct = ctypes.sizeof(_TrustData)
@@ -106,10 +103,8 @@ def _cached_signer(path):
 
 
 def check_game_folder(folder, exe_name):
-    """None if it's fine to launch, otherwise what's wrong.
-
-    the exe has to be riot's. every other exe/dll in there gets loaded into it, so those need a
-    valid signature too, but not necessarily riot's. microsoft and unity ship a couple"""
+    """None if it's fine to launch, otherwise what's wrong. the exe has to be riot's, the other
+    exes/dlls just need a valid signature (microsoft and unity ship a couple)"""
     exe = os.path.join(folder, exe_name)
     try:
         if _cached_signer(exe) != RIOT:

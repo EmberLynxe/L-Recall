@@ -1,10 +1,4 @@
-"""vanguard status. read only.
-
-l-recall never starts, stops or reconfigures vanguard. riot's faq says the only sanctioned ways to
-turn it off are exit vanguard in its tray menu or uninstalling it, and anything else can stop you
-playing. there used to be a switch here that flipped the service settings. it's gone, and with
-pre-check (on demand vanguard) it would've quietly broken riot's setup anyway
-"""
+"""vanguard status. read only, we never start, stop or change it"""
 import win32service
 
 SERVICES = ('vgk', 'vgc')
@@ -26,9 +20,7 @@ def _query(scm, name):
 
 
 def status():
-    """installed / running / mode. mode is boot (classic), on_demand (pre-check, starts with a
-    riot game) or disabled. on_demand also covers setups where someone turned it off the old way,
-    there's no telling those apart from the outside, so we don't pretend to"""
+    """installed / running / mode. mode is boot, on_demand (pre-check) or disabled"""
     try:
         scm = win32service.OpenSCManager(None, None, win32service.SC_MANAGER_CONNECT)
     except win32service.error:

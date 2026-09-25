@@ -136,7 +136,7 @@ class VanguardCheckTest(unittest.TestCase):
             self.assertIn('Riot Client', message)
 
     def test_nothing_in_here_changes_vanguard(self):
-        # read only. if a set/stop/start ever comes back, this should make someone think twice
+        # vanguard stays read only
         self.assertFalse([n for n in dir(vanguard) if n.startswith(('set', 'stop', 'start', 'enable', 'disable'))])
         self.assertTrue(vanguard.status()['installed'] in (True, False, None))
 
