@@ -62,4 +62,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
-        run: gh release create "$TAG" dist/L-Recall-*-win64.zip dist/L-Recall-*-win64.zip.sha256 --title "L-Recall $TAG" --generate-notes
+        # notes are the tag message minus its first line. empty or lightweight tag, github writes them
+        run: |
+          sha=$(gh api "repos/$GH_REPO/git/ref/tags/$TAG" --jq .object.sha)
+          { gh api "repos/$GH_REPO/git/tags/$sha" --jq .message 2>/dev/null || true; } | tail -n +2 > notes.md
+          if grep -q '[^[:space:]]' notes.md; then notes=(--notes-file notes.md); else notes=(--generate-notes); fi
+          gh release create "$TAG" dist/L-Recall-*-win64.zip dist/L-Recall-*-win64.zip.sha256 --title "L-Recall $TAG" "${notes[@]}"
