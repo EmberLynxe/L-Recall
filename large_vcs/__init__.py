@@ -97,8 +97,7 @@ def _write_json_atomic(path, data, **kw):
     os.replace(tmp, path)
 
 
-# everything below reads json off disk and turns it into paths. a storage folder someone
-# handed you could say "..\..\whatever", so nothing gets used until it passes these
+# patch json could come from anyone's storage folder. check it before it turns into a path
 _DIGEST = re.compile(r'[0-9a-f]{64}')
 _TAG = re.compile(r'[0-9A-Za-z][0-9A-Za-z._-]*')
 
@@ -202,7 +201,7 @@ def _delete_tree(folders, label):
         try:
             _unlink_blob(path)
         except OSError:
-            pass  # in use. rmtree below skips it the same way it always did
+            pass  # in use, rmtree skips it too
     for folder in folders:
         shutil.rmtree(folder, ignore_errors=True)
 
@@ -881,8 +880,7 @@ class LargeVCS:
             return len(unused)
 
     def wipe(self):
-        """every stored patch, gone. only lvcs\\ and current\\ though. this used to rmtree the whole
-        folder, including anything else you kept in there"""
+        """every stored patch. just lvcs\\ and current\\, not the whole folder"""
         with self.lock:
             self.packs.close()
             _pack_stores.pop(self.files_dir, None)

@@ -1,9 +1,5 @@
-"""uninstall. there's no installer, so this is all of it.
-
-startup shortcut, icon cache, optionally the stored patches, then the program folder. the
-program can't delete itself while it's running, so a little batch file waits for it to
-close and finishes the job. it only deletes files we shipped, never the whole folder,
-in case someone unzipped this straight into Downloads"""
+"""uninstall. the exe can't delete itself, so a batch file finishes up after we close.
+only deletes files we ship, people unzip this straight into Downloads"""
 import os
 import shutil
 import subprocess
@@ -93,8 +89,7 @@ def schedule_program_removal(app_dir):
     fd, path = tempfile.mkstemp(prefix='l-recall-uninstall-', suffix='.cmd')
     with os.fdopen(fd, 'w', encoding='ascii') as f:
         f.write(script.replace('\n', '\r\n'))
-    # the install path goes in through the environment. on cmd's command line a folder with % or &
-    # in its name gets mangled, env vars expand once and that's it
+    # path goes in through an env var, a % or & in the folder name breaks cmd's command line
     env = {**os.environ, 'LRECALL_DIR': os.path.abspath(app_dir)}
     subprocess.Popen(f'cmd.exe /d /s /c ""{path}""', env=env, close_fds=True, cwd=tempfile.gettempdir(),
                      creationflags=subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP)
