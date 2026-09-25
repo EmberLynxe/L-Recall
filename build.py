@@ -30,8 +30,7 @@ dist = setup(
                    icon='raster/icon.ico', base='gui', copyright=COPYRIGHT),
     ])
 
-# what shows up in the exe's properties, and code signing wants a proper product name and version in
-# there. cx_freeze takes them from pyproject, which gives "l-recall" and the entire readme as a comment
+# redo the exe properties. cx_freeze pulls them from pyproject and you get "l-recall" plus the whole readme
 build = dist.get_command_obj('build_exe')
 if getattr(build, 'build_exe', None):
     VersionInfo(__version__, description=DESCRIPTION, company='EmberLynxe', product='L-Recall',

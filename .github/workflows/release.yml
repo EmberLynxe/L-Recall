@@ -7,8 +7,7 @@ on:
   pull_request:
   workflow_dispatch:
 
-# read only unless a job says otherwise. only the release job gets to write
-# actions are pinned to exact commits so a moved tag can't swap them out
+# read only, release job gets write. actions pinned to commits
 permissions:
   contents: read
 

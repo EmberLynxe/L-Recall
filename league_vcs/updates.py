@@ -33,7 +33,7 @@ def _fetch_latest(timeout=10):
     version = parse_version(data.get('tag_name'))
     if not version:
         return None
-    # this url gets opened with a click, so it has to be our releases page and nothing else
+    # only ever open our own releases page
     url = data.get('html_url') or ''
     if not isinstance(url, str) or not url.startswith(RELEASES_URL + '/'):
         url = RELEASES_URL
