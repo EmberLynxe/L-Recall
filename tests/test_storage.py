@@ -3,6 +3,7 @@ import json
 import os
 import shutil
 import stat
+import struct
 import tempfile
 import unittest
 from unittest import mock
@@ -123,6 +124,30 @@ class StorageTest(RepoTest):
         self.assertEqual((report['exact'], report['whole']), (2, 0))
         for digest in whole:
             self.assertFalse(os.path.exists(os.path.join(self.repo.files_dir, digest)))
+        self.repo.restore('OLD')
+        self.assertStagedEqual(inst)
+
+    def test_optimize_keeps_empty_placeholder_wads(self):
+        # an empty wad is one piece that's the whole file, so the piece and the old copy are the same file
+        empty = b'RW' + bytes([3, 4]) + bytes(256) + struct.pack('<QI', 0, 0)
+        inst = self.install('p1', {
+            r'DATA\Audio.wad.client': empty, r'DATA\Online.wad.client': empty,
+            r'DATA\real.wad.client': ('wad', random_assets(10, seed=12), 12),
+        })
+        patch, dups = {}, {}
+        for rel in (r'DATA\Audio.wad.client', r'DATA\Online.wad.client', r'DATA\real.wad.client'):
+            src = os.path.join(inst, rel)
+            digest = hash_file(src)
+            dst = os.path.join(self.repo.files_dir, digest)
+            if not os.path.exists(dst):
+                shutil.copyfile(src, dst)
+            LargeVCS._record(patch, dups, digest, rel)
+        with open(self.repo.repo_path('patches', 'OLD.json'), 'w') as f:
+            json.dump(patch, f)
+        with open(self.repo.repo_path('patches', 'OLD.json.dups'), 'w') as f:
+            json.dump(dups, f)
+        with mock.patch('league_vcs.winproc.game_running', return_value=False):
+            self.repo.optimize(log=lambda *_: None)
         self.repo.restore('OLD')
         self.assertStagedEqual(inst)
 

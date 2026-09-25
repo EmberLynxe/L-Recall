@@ -826,8 +826,14 @@ class LargeVCS:
                     if any(c in pending for c in patch):
                         patches[tag] = {pending.get(c, c): rp for c, rp in patch.items()}
                         self._save_patch(tag, patches[tag])
+                # an empty wad's only piece is the whole file, so the old copy is also a piece.
+                # only delete what nothing points at any more
+                in_use = set()
+                for patch in patches.values():
+                    in_use |= _collect_all_hashes(patch, self.files_dir)
                 for old in pending:
-                    _unlink_blob(os.path.join(self.files_dir, old))
+                    if old not in in_use:
+                        _unlink_blob(os.path.join(self.files_dir, old))
                 pending, pending_bytes = {}, 0
 
             def convert(checksum):
