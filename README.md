@@ -25,7 +25,7 @@
 
 The League client only plays replays from the current patch, so every time the game updates, your old replays stop working. L-Recall keeps a copy of each patch you've had installed and launches the right one when you want to watch something. It's also a replay browser, so you can look through your games and their stats without opening the client.
 
-**Heads up:** it's new. It works on my machine, which so far is the only machine it's been on. If it breaks on yours, [tell me](https://github.com/EmberLynxe/L-Recall/issues).
+It's new and so far it's only been run on my PC, so if it breaks on yours, [open an issue](https://github.com/EmberLynxe/L-Recall/issues).
 
 ## What it does
 
@@ -35,9 +35,7 @@ The League client only plays replays from the current patch, so every time the g
 - Tags and notes on any game. Search `#tag` to find them again.
 - A League of Graphs button for every game.
 
-Storage is smarter than just copying the game folder. Most of the game doesn't change between patches, so each piece is only stored once. The first patch is a full copy (around 25 to 30 GB) and after that each patch usually adds a few GB. Four patches that took 80 GB in the old League VCS format come out to about 34 GB.
-
-The game files it rebuilds are byte for byte the same as what Riot shipped, checked against the original's hash.
+It doesn't copy the whole game folder every patch. Most files don't change between patches, so each one is only stored once. The first patch is a full copy (around 25 to 30 GB), after that it's usually a few GB per patch. My four patches went from 80 GB in the old League VCS format to about 34 GB. Rebuilt game files get checked byte for byte against what Riot shipped.
 
 ## Setup
 
@@ -54,14 +52,13 @@ Replays are the `.rofl` files you get from the download button in match history.
 
 ## Vanguard
 
-L-Recall doesn't touch the game or Vanguard. It starts Riot's own unmodified game client with the replay file, same as the client does when you hit watch. It reads whether Vanguard is running so it can warn you, and that's it. It never starts, stops or changes Vanguard.
+L-Recall starts Riot's own game client with the replay file, the same way the client does when you hit watch. It checks whether Vanguard is running so it can warn you, but it never starts, stops or changes it.
 
-- Replays from 14.9 onwards need Vanguard running, because that's when it came out. L-Recall warns you if it isn't.
-- If your PC uses Vanguard [Pre-Check](https://support.riotgames.com/en-us/riot/performance/vanguard-pre-check), Vanguard only runs while a Riot game does. If a new replay won't open, start League from the Riot Client first.
-- Older replays don't need Vanguard. They should play fine with it on too, but that's less tested, so there's an optional warning for it. If one crashes, exit Vanguard from its own tray icon. That's the way [Riot supports](https://support.riotgames.com/en-us/league-of-legends/performance/riot-vanguard-faq-league-of-legends), and it comes back the next time you restart.
+- Replays from 14.9 on need Vanguard running (that's when it came out).
+- If your PC uses [Pre-Check](https://support.riotgames.com/en-us/riot/performance/vanguard-pre-check), Vanguard only runs while a Riot game is open. If a newer replay won't open, start League from the Riot Client first.
+- Older replays don't need it. They should still play with it on, but I haven't tested that much, so there's an optional warning. If one crashes, exit Vanguard from its tray icon ([Riot's FAQ](https://support.riotgames.com/en-us/league-of-legends/performance/riot-vanguard-faq-league-of-legends)). It comes back next restart.
 
-> [!TIP]
-> Easiest thing is to just leave Vanguard on. Everything works that way with no restarts.
+Easiest is to just leave Vanguard on.
 
 ## Things to know
 
@@ -92,12 +89,12 @@ venv\Scripts\python entrypoints\main.py
 
 ## Code signing policy
 
-Release builds come from GitHub Actions, built straight from the tagged source in this repo. Nobody uploads an exe by hand.
+Releases are built by GitHub Actions from tagged commits in this repo, never uploaded by hand.
 
 - Committers and reviewers: [EmberLynxe](https://github.com/EmberLynxe)
 - Approvers: [EmberLynxe](https://github.com/EmberLynxe)
 
-Privacy: L-Recall only talks to two things over the network. Riot's Data Dragon CDN serves champion, item and rune icons, and GitHub gets asked whether there's a newer release. Automatic icon downloads and update checks can both be turned off in Settings. Nothing about you or your replays is sent anywhere.
+Privacy: it only talks to Riot's Data Dragon (icons) and GitHub (update checks), both can be turned off in Settings, and nothing about you or your replays gets sent.
 
 ## Support
 
