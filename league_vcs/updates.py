@@ -9,6 +9,7 @@ from league_vcs import __version__
 
 REPO = 'EmberLynxe/L-Recall'
 RELEASES_URL = f'https://github.com/{REPO}/releases'
+DOWNLOADS_URL = f'{RELEASES_URL}/download/'
 _API = f'https://api.github.com/repos/{REPO}/releases/latest'
 _CACHE_SECONDS = 60 * 60
 
@@ -37,9 +38,23 @@ def _fetch_latest(timeout=10):
     url = data.get('html_url') or ''
     if not isinstance(url, str) or not url.startswith(RELEASES_URL + '/'):
         url = RELEASES_URL
+    # the zip and its hash, for updating in place. same deal, has to come from our own releases
+    zip_url = sha_url = None
+    size = 0
+    for asset in data.get('assets') or []:
+        link = asset.get('browser_download_url') or ''
+        if not isinstance(link, str) or not link.startswith(DOWNLOADS_URL):
+            continue
+        if link.endswith('-win64.zip'):
+            zip_url, size = link, asset.get('size') or 0
+        elif link.endswith('-win64.zip.sha256'):
+            sha_url = link
     return {
         'version': '.'.join(map(str, version)),
         'url': url,
+        'zip': zip_url,
+        'sha256': sha_url,
+        'size': size,
         'notes': (data.get('body') or '')[:2000],
         'published': data.get('published_at'),
     }

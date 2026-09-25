@@ -432,7 +432,8 @@ tr.me .pl-n { color: var(--gold); }
 
   <div class="upd" id="upd" style="display:none">
     <span id="upd-txt"></span>
-    <button class="btn primary" onclick="updDownload()">Download</button>
+    <button class="btn primary" id="upd-go" onclick="updInstall()">Update now</button>
+    <button class="btn" onclick="updDownload()">What's new</button>
     <button class="btn" onclick="updLater()">Later</button>
   </div>
 
@@ -539,7 +540,7 @@ tr.me .pl-n { color: var(--gold); }
             <div class="cache-info" id="upd-info">...</div>
             <div class="inl">
               <button class="btn" onclick="updCheckNow()">Check now</button>
-              <button class="btn primary" id="upd-get" style="display:none" onclick="updDownload()">Download</button>
+              <button class="btn primary" id="upd-get" style="display:none" onclick="updInstall()">Update now</button>
             </div>
             <label class="check"><input type="checkbox" id="upd-auto" onchange="updAuto(this.checked)"> Check for updates automatically</label>
           </div>
@@ -1500,11 +1501,14 @@ async function loadVanguard() {
   } catch (e) { $('vg-info').textContent = 'Couldn\'t read Vanguard status.'; }
 }
 // updates
-let updInfo = null;
+let updInfo = null, updCanInstall = false;
 async function checkUpdate(force) {
   let res;
   try { res = await call('check_update', { force }); } catch (e) { return null; }
   updInfo = res.update;
+  updCanInstall = !!res.can_install;
+  $('upd-go').textContent = updCanInstall ? 'Update now' : 'Download';
+  $('upd-get').textContent = updCanInstall ? 'Update now' : 'Download';
   $('about-ver').textContent = res.current;
   const show = !!res.update && res.update.version !== res.dismissed;
   $('upd').style.display = show ? '' : 'none';
@@ -1531,6 +1535,14 @@ async function updCheckNow() {
   $('upd-get').style.display = updInfo ? '' : 'none';
 }
 function updDownload() { openLink(updInfo ? updInfo.url : 'https://github.com/EmberLynxe/L-Recall/releases'); }
+async function updInstall() {
+  if (!updInfo) return;
+  if (!updCanInstall) { updDownload(); return; }
+  if (!await cfmDlg('Update to L-Recall ' + updInfo.version + '? It downloads the new version, closes, and opens again by itself. Settings and stored patches stay as they are.', 'Update', false)) return;
+  $('upd').style.display = 'none';
+  openCon('Updating to ' + updInfo.version);
+  await call('install_update');
+}
 async function updLater() {
   $('upd').style.display = 'none';
   if (updInfo) await call('dismiss_update', { version: updInfo.version });

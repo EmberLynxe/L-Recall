@@ -89,7 +89,7 @@ class GUI:
                 self.config.save()
         self.install_startup()
         self.set_low_priority()
-        self.tray_icon = TrayItem([], on_left_click=0)
+        self.tray_icon = TrayItem([], on_click=self.open_settings)
         self.update_tray_menu()
         self.auto_scan_loop()
         self.update_check_loop()
@@ -117,7 +117,7 @@ class GUI:
 
     def update_tray_menu(self):
         scan_option = ('Scanning...', None) if self.scan_lock.locked() else ('Scan Now', self.scan_game_directories)
-        update_option = ((f"Download update ({self.update_info['version']})", self.open_update), None) \
+        update_option = ((f"Update to {self.update_info['version']}", self.open_update), None) \
             if self.update_info else ()
         tray_menu = (
             *update_option,
@@ -148,10 +148,14 @@ class GUI:
             self._told_about = release['version']
             wx.CallAfter(self.tray_icon.ShowBalloon,
                          title=f"L-Recall {release['version']} is out",
-                         text='Right-click the tray icon and pick Download update.')
+                         text='Open L-Recall and hit Update now.')
 
     def open_update(self, *_):
-        webbrowser.open(self.update_info['url'] if self.update_info else updates.RELEASES_URL)
+        # the built app updates itself from the banner. from source there's nothing to swap, so the page
+        if getattr(sys, 'frozen', False):
+            self.open_settings()
+        else:
+            webbrowser.open(self.update_info['url'] if self.update_info else updates.RELEASES_URL)
 
     def exit(self, *_):
         if self.tray_icon:

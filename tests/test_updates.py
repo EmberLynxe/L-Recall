@@ -1,9 +1,13 @@
 """update checker. never actually hits github"""
+import hashlib
+import io
 import json
+import os
 import unittest
+import zipfile
 from unittest import mock
 
-from league_vcs import updates
+from league_vcs import selfupdate, updates
 
 
 def release(tag):
@@ -51,6 +55,64 @@ class UpdateTest(unittest.TestCase):
             self.assertEqual(fetch.call_count, 1)
             updates.latest(force=True)
             self.assertEqual(fetch.call_count, 2)
+
+    def test_download_links_have_to_be_ours(self):
+        ours = updates.DOWNLOADS_URL + 'v2.0.0/L-Recall-v2.0.0-win64.zip'
+        body = json.dumps({'tag_name': 'v2.0.0', 'html_url': '', 'assets': [
+            {'browser_download_url': 'https://evil.example/L-Recall-v2.0.0-win64.zip'},
+            {'browser_download_url': ours, 'size': 5},
+            {'browser_download_url': ours + '.sha256'}]}).encode()
+        fake = mock.MagicMock(__enter__=lambda s: mock.MagicMock(read=lambda: body))
+        with mock.patch('urllib.request.urlopen', return_value=fake):
+            r = updates._fetch_latest()
+        self.assertEqual((r['zip'], r['sha256'], r['size']), (ours, ours + '.sha256', 5))
+
+
+class SelfUpdateTest(unittest.TestCase):
+    def serve(self, files):
+        """urlopen that hands out these bytes by url"""
+        def fake(req, timeout=None):
+            data = files[req.full_url]
+            m = mock.MagicMock()
+            m.__enter__ = lambda s: m
+            m.__exit__ = lambda *a: False
+            m.headers = {'Content-Length': str(len(data))}
+            chunks = iter([data, b''])
+            m.read = lambda *a: next(chunks)
+            return m
+        return mock.patch('urllib.request.urlopen', side_effect=fake)
+
+    def release(self, zip_bytes, sha=None):
+        base = updates.DOWNLOADS_URL + 'v9.0.0/L-Recall-v9.0.0-win64.zip'
+        sha = sha or hashlib.sha256(zip_bytes).hexdigest().upper() + '\r\n'
+        return {'zip': base, 'sha256': base + '.sha256'}, {base: zip_bytes, base + '.sha256': sha.encode()}
+
+    def make_zip(self, names):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, 'w') as z:
+            for n in names:
+                z.writestr(n, b'x')
+        return buf.getvalue()
+
+    def test_good_update_unpacks(self):
+        release, files = self.release(self.make_zip(['L-Recall.exe', 'lib/a.pyd', 'python3.dll']))
+        with self.serve(files):
+            new = selfupdate.download(release)
+        self.assertTrue(os.path.isfile(os.path.join(new, 'lib', 'a.pyd')))
+
+    def test_wrong_hash_is_refused(self):
+        release, files = self.release(self.make_zip(['L-Recall.exe']), sha='0' * 64)
+        with self.serve(files), self.assertRaises(ValueError):
+            selfupdate.download(release)
+
+    def test_zip_escaping_the_folder_is_refused(self):
+        release, files = self.release(self.make_zip(['L-Recall.exe', '../../evil.exe']))
+        with self.serve(files), self.assertRaises(ValueError):
+            selfupdate.download(release)
+
+    def test_only_our_downloads(self):
+        with self.assertRaises(ValueError):
+            selfupdate.download({'zip': 'https://evil.example/x.zip', 'sha256': 'https://evil.example/x.sha256'})
 
 
 if __name__ == '__main__':

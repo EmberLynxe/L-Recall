@@ -18,7 +18,7 @@ from ..utils.frame import CallbackFrame
 from ..utils.output import capture
 from large_vcs.progress import reporting
 
-from ... import __version__, assets, core, uninstall, updates, vanguard, winproc
+from ... import __version__, assets, core, selfupdate, uninstall, updates, vanguard, winproc
 from ...config import Config
 from ...notes import Notes
 from ...exceptions import UserInputException
@@ -436,7 +436,33 @@ class SettingsFrame(CallbackFrame):
         latest = updates.latest() if (enabled or force) else None
         self._respond(req_id, {'current': __version__, 'update': release, 'enabled': enabled,
                                'latest': latest['version'] if latest else None,
+                               'can_install': bool(selfupdate.can_update() and release and release.get('zip')),
                                'dismissed': self.config.get('dismissed_update', '')})
+
+    def _handle_install_update(self, req_id, _msg):
+        self._run_console_op(req_id, self._do_update)
+
+    def _do_update(self):
+        if not selfupdate.can_update():
+            print('Running from source, so there\'s nothing to update in place.')
+            return
+        release = updates.newer_than_running(force=True)
+        if not release:
+            print('Already on the newest version.')
+            return
+        print(f"Downloading L-Recall {release['version']}...")
+        new = selfupdate.download(release)
+        print('Download matches its published hash.')
+        repo = self._repo_or_none()
+        if repo:
+            # a patch getting stored right now finishes first. the lock is never let go on purpose,
+            # it goes when we exit so nothing new starts in the meantime
+            print('Waiting for patch storage to be idle...')
+            repo.lock.__enter__()
+        selfupdate.apply(new, os.path.dirname(sys.executable))
+        print('L-Recall will close and open again on the new version in a few seconds.')
+        if self._quit_app:
+            wx.CallLater(2500, self._quit_app)
 
     def _handle_dismiss_update(self, req_id, msg):
         self.config['dismissed_update'] = msg.get('version', '')

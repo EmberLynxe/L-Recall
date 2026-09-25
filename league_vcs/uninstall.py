@@ -21,8 +21,8 @@ def _startup_folder():
 def _shipped():
     """(folders, files) cx_freeze puts next to the exe, plus what we write there ourselves"""
     py = f'python{sys.version_info.major}{sys.version_info.minor}.dll'
-    folders = ['lib', 'logs']
-    files = ['L-Recall.exe', 'python3.dll', py, 'WebView2Loader.dll', 'frozen_application_license.txt',
+    folders = ['lib', 'lib.old', 'logs']
+    files = ['L-Recall.exe', 'L-Recall.exe.old', 'python3.dll', py, 'WebView2Loader.dll', 'frozen_application_license.txt',
              'user_settings.json', 'user_settings.json.*', 'replay_notes.json', 'replay_notes.json.*']
     return folders, files
 
@@ -67,7 +67,7 @@ del /f /q "%LRECALL_DIR%\L-Recall.exe" >nul 2>&1
 if not exist "%LRECALL_DIR%\L-Recall.exe" goto gone
 set /a tries+=1
 if %tries% geq 60 goto end
-ping -n 2 127.0.0.1 >nul
+"%SystemRoot%\System32\ping.exe" -n 2 127.0.0.1 >nul
 goto wait
 :gone
 {folders}
