@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "l-recall"
+version = "1.0.0"
+description = "Watch any League of Legends replay on the patch it was recorded on."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+authors = [
+    { name = "EmberLynxe" },
+]
+dependencies = [
+    "click>=8.0",
+    "pywin32>=306",
+    "wxPython>=4.2",
+    "tqdm>=4.60",
+    "zstandard>=0.20",
+    "xxhash>=3.0",
+]
+
+[project.scripts]
+l-recall = "league_vcs.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/EmberLynxe/L-Recall"
+Issues = "https://github.com/EmberLynxe/L-Recall/issues"
+
+[tool.setuptools.packages.find]
+include = ["league_vcs*", "large_vcs*"]

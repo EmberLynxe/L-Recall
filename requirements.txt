@@ -1,0 +1,7 @@
+click==8.5.0
+pywin32==312
+wxPython==4.3.1
+tqdm==4.70.1
+zstandard==0.25.0
+xxhash==4.0.1
+cx_Freeze==8.7.0

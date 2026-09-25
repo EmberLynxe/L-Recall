@@ -1,0 +1,1635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>L-Recall</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0b0f14;
+  --panel: #11161d;
+  --raise: #182029;
+  --hover: #1d2631;
+  --line: #1c242e;
+  --line2: #29333f;
+
+  --t1: #e6e8eb;
+  --t2: #a3abb5;
+  --t3: #6a7480;
+
+  --gold: #c8aa6e;
+  --win: #4d8fe8;
+  --win-row: #14203a;
+  --win-row-h: #192845;
+  --loss: #e3545e;
+  --loss-row: #2a181d;
+  --loss-row-h: #331d23;
+  --flat-row: #141a22;
+
+  --list-w: 450px;
+}
+html, body { height: 100%; overflow: hidden; }
+body {
+  font: 13px/1.4 'Segoe UI', system-ui, sans-serif; color: var(--t2); background: var(--bg);
+  display: flex; flex-direction: column;
+  user-select: none; -webkit-user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #232c37; border: 3px solid var(--bg); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: #33404e; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+input { font: inherit; }
+svg { display: block; }
+a { color: inherit; }
+
+/* controls */
+.btn {
+  height: 28px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12.5px; font-weight: 500; color: var(--t1);
+  background: var(--raise); border: 1px solid var(--line2); border-radius: 3px; white-space: nowrap;
+}
+.btn:hover { background: var(--hover); border-color: #37424f; }
+.btn:active { background: var(--panel); }
+.btn:disabled { opacity: .4; pointer-events: none; }
+.btn.primary { background: var(--gold); border-color: var(--gold); color: #0b0f14; font-weight: 600; }
+.btn.primary:hover { background: #d6ba80; border-color: #d6ba80; }
+.btn.danger:hover { border-color: #7d3037; color: #ff9aa2; }
+.input {
+  height: 30px; width: 100%; padding: 0 10px; color: var(--t1); font-size: 13px;
+  background: var(--panel); border: 1px solid var(--line2); border-radius: 3px; outline: none;
+}
+.input:focus { border-color: #4a5664; }
+.input::placeholder { color: var(--t3); }
+
+/* top bar */
+.top { height: 40px; flex-shrink: 0; display: flex; align-items: stretch; background: var(--panel); border-bottom: 1px solid var(--line); padding: 0 14px; }
+.brand { display: flex; align-items: center; gap: 8px; margin-right: 22px; font-weight: 600; color: var(--t1); }
+.brand svg { color: var(--gold); }
+.tabs { display: flex; }
+.tabs button { padding: 0 12px; font-weight: 500; color: var(--t3); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tabs button:hover { color: var(--t2); }
+.tabs button.on { color: var(--t1); border-bottom-color: var(--gold); }
+.stat { margin-left: auto; display: flex; align-items: center; gap: 16px; font-size: 12px; color: var(--t3); }
+.stat b { color: var(--t2); font-weight: 600; }
+.stat .warn { color: var(--gold); cursor: pointer; }
+
+.pnl { display: none; flex: 1; min-height: 0; }
+.pnl.on { display: flex; }
+
+/* champion / item images */
+.ci { position: relative; display: block; overflow: hidden; background: var(--raise); flex-shrink: 0; border-radius: 3px; }
+.ci::before { content: attr(data-n); position: absolute; inset: 0; display: grid; place-items: center; font-size: 10px; font-weight: 600; color: var(--t3); }
+.ci img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(1.08); }
+.champ { position: relative; flex-shrink: 0; }
+.champ .lvl {
+  position: absolute; right: -3px; bottom: -3px; min-width: 16px; height: 14px; padding: 0 3px;
+  display: grid; place-items: center; font-size: 9.5px; font-weight: 700; color: var(--t1);
+  background: #06090c; border-radius: 2px;
+}
+
+/* replays */
+.split { flex: 1; display: flex; min-width: 0; }
+.list-pane { width: var(--list-w); flex-shrink: 0; display: flex; flex-direction: column; min-height: 0; }
+.divider { width: 1px; background: var(--line); cursor: col-resize; position: relative; flex-shrink: 0; }
+.divider::after { content: ''; position: absolute; inset: 0 -4px; }
+.divider:hover, .divider.drag { background: #3a4552; }
+
+.list-tools { padding: 10px 10px 0; }
+.filters { display: flex; gap: 2px; margin-top: 6px; border-bottom: 1px solid var(--line); }
+.filters { overflow: hidden; }
+.filters button { flex-shrink: 0; height: 30px; padding: 0 6px; font-size: 12.5px; color: var(--t3); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.filters button span { color: var(--t3); margin-left: 3px; font-size: 11.5px; }
+.filters button:hover { color: var(--t2); }
+.filters button.on { color: var(--t1); border-bottom-color: var(--gold); }
+
+.rlist { flex: 1; overflow-y: auto; min-height: 0; padding-bottom: 10px; }
+.day { display: flex; justify-content: space-between; padding: 12px 12px 5px; font-size: 12px; font-weight: 600; color: var(--t2); }
+.day .rec { font-weight: 400; color: var(--t3); }
+.row {
+  display: grid; grid-template-columns: 58px 44px minmax(0,1fr) auto; column-gap: 10px; align-items: center;
+  margin: 0 8px 2px; padding: 8px 10px 8px 9px; min-height: 60px;
+  background: var(--flat-row); border-left: 3px solid #3a4452; border-radius: 3px;
+  scroll-margin: 8px;
+}
+.row:hover { background: var(--hover); }
+.row.win { background: var(--win-row); border-left-color: var(--win); }
+.row.win:hover { background: var(--win-row-h); }
+.row.loss { background: var(--loss-row); border-left-color: var(--loss); }
+.row.loss:hover { background: var(--loss-row-h); }
+.row.sel { box-shadow: inset 0 0 0 1px rgba(200,170,110,.7); }
+.res { font-size: 12.5px; font-weight: 700; color: var(--t2); }
+.win .res { color: var(--win); }
+.loss .res { color: var(--loss); }
+.dur { font-size: 11.5px; color: var(--t3); margin-top: 1px; }
+.row .ci { width: 44px; height: 44px; }
+.kda { font-size: 14px; font-weight: 700; color: var(--t1); white-space: nowrap; }
+.kda i { font-style: normal; font-weight: 400; color: var(--t3); margin: 0 3px; }
+.kda .d { color: #f0858c; }
+.sub { font-size: 11.5px; color: var(--t3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sub b { font-weight: 600; color: var(--t2); }
+.side { text-align: right; font-size: 11.5px; line-height: 1.55; white-space: nowrap; }
+.side .tm { color: var(--t2); }
+.side .pt { color: var(--t3); }
+.nostore { color: var(--t3); border: 1px solid var(--line2); border-radius: 2px; padding: 0 4px; font-size: 10.5px; margin-left: 4px; }
+.row.plain { grid-template-columns: 58px minmax(0,1fr) auto; }
+.row.me { grid-template-columns: 58px 44px minmax(0,1fr) auto auto; }
+.tms { display: flex; flex-direction: column; gap: 2px; }
+.tms div { display: flex; gap: 2px; }
+.tms .ci { width: 16px; height: 16px; border-radius: 2px; }
+.tms .ci::before { font-size: 0; }
+.tms .ci.me { box-shadow: 0 0 0 1px var(--gold); }
+.notplayed { display: inline-block; font-size: 10.5px; color: var(--t2); border: 1px solid var(--line2); border-radius: 2px; padding: 0 5px; margin-top: 2px; }
+.notice { margin-top: 4px; font-size: 12px; color: var(--t2); display: flex; align-items: center; gap: 6px; }
+.notice::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--t3); }
+.mini { display: flex; gap: 2px; align-items: center; }
+.mini .ci { width: 18px; height: 18px; border-radius: 2px; }
+.mini .ci::before { font-size: 0; }
+.mini .vs { width: 6px; }
+
+.empty { padding: 40px 16px; text-align: center; color: var(--t3); line-height: 1.6; }
+.empty b { display: block; color: var(--t2); font-weight: 600; }
+.skel { margin: 0 8px 2px; height: 60px; border-radius: 3px; background: var(--flat-row); animation: pulse 1.2s ease-in-out infinite alternate; }
+@keyframes pulse { to { background: #18202a; } }
+
+/* detail */
+.detail { flex: 1; min-width: 0; display: flex; flex-direction: column; container-type: inline-size; container-name: det; }
+.detail .empty { margin: auto; }
+.dhead {
+  flex-shrink: 0; display: grid; grid-template-columns: 56px minmax(0,1fr) auto; gap: 14px; align-items: center;
+  padding: 14px 20px; background: var(--flat-row); border-bottom: 1px solid var(--line); border-left: 4px solid #3a4452;
+}
+.dhead.win { background: var(--win-row); border-left-color: var(--win); }
+.dhead.loss { background: var(--loss-row); border-left-color: var(--loss); }
+.dhead .ci { width: 56px; height: 56px; }
+.dh1 { display: flex; align-items: baseline; gap: 10px; }
+.dh1 .res { font-size: 18px; }
+.dh1 .nm { font-size: 15px; font-weight: 600; color: var(--t1); }
+.dh2 { margin-top: 2px; font-size: 13px; color: var(--t2); }
+.dh2 b { color: var(--t1); font-weight: 600; }
+.dh3 { margin-top: 3px; font-size: 12px; color: var(--t3); }
+.dh2 span + span::before, .dh3 span + span::before { content: '·'; margin: 0 7px; color: var(--t3); }
+.acts { display: flex; gap: 6px; align-items: center; }
+@container det (max-width: 760px) {
+  .dhead { grid-template-columns: 56px minmax(0,1fr); }
+  .dhead .acts { grid-column: 1 / -1; }
+}
+.acts-note { grid-column: 2 / -1; font-size: 12px; color: var(--gold); margin-top: -4px; }
+
+.dbody { flex: 1; overflow: auto; min-height: 0; padding: 14px 20px 24px; }
+.team { margin-bottom: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
+.thead { display: flex; align-items: baseline; gap: 8px; padding: 8px 12px; border-left: 3px solid #3a4452; }
+.team.win .thead { background: var(--win-row); border-left-color: var(--win); }
+.team.loss .thead { background: var(--loss-row); border-left-color: var(--loss); }
+.thead .res { font-size: 13px; }
+.thead .who { color: var(--t2); }
+.thead .tot { margin-left: auto; font-size: 12px; color: var(--t3); }
+.thead .tot b { color: var(--t2); font-weight: 600; }
+
+.sb { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.sb th { padding: 7px 8px 5px; font-size: 11.5px; font-weight: 600; color: var(--t3); text-align: left; border-bottom: 1px solid var(--line); }
+.sb td { padding: 5px 8px; color: var(--t2); vertical-align: middle; }
+.sb tbody tr + tr td { border-top: 1px solid var(--line); }
+.sb .n { text-align: right; }
+.sb tr.me td { background: rgba(200,170,110,.07); }
+.sb tr.me td:first-child { box-shadow: inset 3px 0 0 var(--gold); }
+.c-kda { width: 92px; } .c-dmg { width: 124px; } .c-gold { width: 62px; } .c-cs { width: 62px; } .c-vis { width: 54px; } .c-items { width: 190px; }
+@container det (max-width: 850px) { .c-vis { display: none; } }
+@container det (max-width: 820px) { .c-gold { display: none; } }
+@container det (max-width: 720px) { .c-dmg { display: none; } }
+.pl { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.pl .ci { width: 32px; height: 32px; }
+.spells { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+.spells img, .spells span { width: 15px; height: 15px; display: block; background: var(--raise); border-radius: 2px; }
+.pl-t { min-width: 0; }
+.pl-c { color: var(--t1); font-weight: 600; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pl-n { color: var(--t3); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+tr.me .pl-n { color: var(--gold); }
+.sb .kda { font-size: 12.5px; }
+.sb .sub { margin-top: 0; }
+.bar { height: 4px; margin-top: 4px; background: var(--line); border-radius: 1px; }
+.bar i { display: block; height: 100%; border-radius: 1px; background: var(--t3); }
+.win .bar i { background: var(--win); }
+.loss .bar i { background: var(--loss); }
+.items { display: flex; gap: 2px; }
+.items img, .items span { width: 22px; height: 22px; display: block; background: var(--bg); border-radius: 2px; }
+.items .trk { margin-left: 4px; }
+.dfoot { font-size: 11.5px; color: var(--t3); padding: 2px 2px 0; }
+.sb tbody tr { cursor: pointer; }
+.sb tbody tr:hover td { background: rgba(255,255,255,.025); }
+.runes-mini { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+.runes-mini img, .runes-mini span { width: 15px; height: 15px; display: block; border-radius: 50%; background: #06090c; }
+.runes-mini img + img { padding: 1px; }
+
+/* detail tabs, tags, notes */
+.dtabs { flex-shrink: 0; display: flex; align-items: center; gap: 2px; padding: 0 20px; background: var(--panel); border-bottom: 1px solid var(--line); min-height: 36px; }
+.dtabs > button { height: 36px; padding: 0 10px; color: var(--t3); border-bottom: 2px solid transparent; margin-bottom: -1px; font-weight: 500; }
+.dtabs > button:hover { color: var(--t2); }
+.dtabs > button.on { color: var(--t1); border-bottom-color: var(--gold); }
+.tagbar { margin-left: auto; display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; }
+.chip { height: 22px; padding: 0 2px 0 7px; display: inline-flex; align-items: center; gap: 2px; font-size: 12px; color: var(--gold); background: rgba(200,170,110,.08); border: 1px solid rgba(200,170,110,.25); border-radius: 3px; white-space: nowrap; }
+.chip button { width: 16px; height: 16px; color: var(--t3); font-size: 13px; line-height: 16px; }
+.chip button:hover { color: var(--t1); }
+.tag-inp { width: 104px; height: 24px; padding: 0 8px; font-size: 12px; color: var(--t1); background: var(--bg); border: 1px solid var(--line2); border-radius: 3px; outline: none; }
+.tag-inp:focus { border-color: #4a5664; }
+.tagbar .btn { height: 24px; padding: 0 8px; font-size: 12px; }
+.notebox { flex-shrink: 0; padding: 8px 20px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.notebox textarea { width: 100%; min-height: 54px; resize: vertical; padding: 7px 9px; font: 12.5px/1.5 'Segoe UI', sans-serif; color: var(--t1); background: var(--bg); border: 1px solid var(--line2); border-radius: 3px; outline: none; user-select: text; -webkit-user-select: text; }
+.notebox textarea:focus { border-color: #4a5664; }
+.rtags { color: var(--gold); }
+.row .kda { overflow: hidden; text-overflow: ellipsis; }
+.kda .rtags { font-size: 11.5px; font-weight: 500; margin-left: 4px; }
+
+/* breakdown */
+.cmp { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px 22px; padding: 12px 14px; margin-bottom: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 3px; }
+.cmp-l { display: flex; justify-content: space-between; font-size: 12px; color: var(--t3); margin-bottom: 4px; }
+.cmp-l b { color: var(--t1); font-weight: 600; }
+.split-bar { display: flex; height: 6px; gap: 2px; }
+.split-bar i { display: block; height: 100%; border-radius: 1px; }
+.ta { background: var(--win); } .tb { background: var(--loss); }
+.legend { display: flex; gap: 12px; font-size: 11.5px; color: var(--t3); margin: 0 2px 8px; }
+.legend span::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 1px; margin-right: 5px; background: var(--c); vertical-align: 0; }
+.charts { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.chart { padding: 10px 12px 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 3px; }
+.chart h4 { display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 600; color: var(--t1); margin-bottom: 8px; }
+.chart h4 span { font-weight: 400; color: var(--t3); font-size: 11.5px; }
+.crow { display: grid; grid-template-columns: 20px minmax(0,1fr) 56px; gap: 8px; align-items: center; height: 23px; }
+.crow + .crow.gap { margin-top: 7px; }
+.crow .ci { width: 20px; height: 20px; }
+.cbar { display: flex; height: 10px; background: var(--bg); border-radius: 2px; overflow: hidden; }
+.cbar i { display: block; height: 100%; }
+.crow .v { text-align: right; font-size: 12px; color: var(--t2); }
+.crow.me .v { color: var(--gold); font-weight: 600; }
+.crow.me .cbar { box-shadow: 0 0 0 1px rgba(200,170,110,.5); }
+.phys { background: #d9884c; } .magic { background: #8f73f0; } .truedmg { background: #d8dde3; }
+
+/* player */
+.psel { display: flex; gap: 4px; align-items: center; margin-bottom: 12px; }
+.psel .ci { width: 34px; height: 34px; opacity: .45; cursor: pointer; }
+.psel .ci:hover { opacity: .8; }
+.psel .ci.on { opacity: 1; box-shadow: 0 0 0 2px var(--gold); }
+.psel .vs { width: 12px; }
+.pgrid { display: grid; grid-template-columns: 290px minmax(0,1fr); gap: 12px; align-items: start; }
+@container det (max-width: 820px) { .pgrid { grid-template-columns: 1fr; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 12px 14px; }
+.card h4 { font-size: 12.5px; font-weight: 600; color: var(--t1); margin-bottom: 8px; }
+.card h4 span { font-weight: 400; color: var(--t3); }
+.rtree { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12.5px; font-weight: 600; color: var(--t2); }
+.rtree img { width: 22px; height: 22px; }
+.rune { display: grid; grid-template-columns: 30px 1fr; gap: 9px; align-items: center; padding: 3px 0; }
+.rune img { width: 30px; height: 30px; border-radius: 50%; background: #06090c; }
+.rune.key img { width: 38px; height: 38px; margin: -4px; }
+.rune b { display: block; font-size: 12.5px; font-weight: 600; color: var(--t1); }
+.rune small { display: block; font-size: 11.5px; color: var(--t3); line-height: 1.35; }
+.rsep { height: 1px; background: var(--line); margin: 10px 0; }
+.shards { display: flex; flex-wrap: wrap; gap: 4px; }
+.shards span { font-size: 11.5px; color: var(--t2); background: var(--raise); border-radius: 2px; padding: 2px 6px; }
+.sgroups { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.srow { display: grid; grid-template-columns: minmax(0,1fr) 74px 74px; gap: 6px; font-size: 12.5px; padding: 3px 0; }
+.srow.hd { font-size: 11px; color: var(--t3); padding-top: 0; }
+.srow.hd span { text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.srow .l { color: var(--t2); }
+.srow .v { text-align: right; color: var(--t1); font-weight: 600; }
+.srow .o { text-align: right; color: var(--t3); }
+.srow .v.up { color: #6fbf73; } .srow .v.down { color: #f0858c; }
+
+/* pages */
+.page { flex: 1; overflow-y: auto; }
+.page-in { max-width: 920px; margin: 0 auto; padding: 20px 24px 40px; }
+.ph { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+.ph h1 { font-size: 17px; font-weight: 600; color: var(--t1); }
+.ph .r { margin-left: auto; display: flex; gap: 6px; }
+.pmeta { font-size: 12px; color: var(--t3); margin-bottom: 16px; }
+.banner {
+  display: flex; align-items: center; gap: 14px; padding: 10px 14px; margin-bottom: 16px;
+  background: var(--panel); border: 1px solid var(--line2); border-left: 3px solid var(--gold); border-radius: 3px;
+}
+.banner .txt { flex: 1; font-size: 12.5px; color: var(--t2); line-height: 1.5; }
+.banner .txt b { color: var(--t1); font-weight: 600; }
+.banner.bad { border-left-color: var(--loss); }
+
+.tbl { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; margin-bottom: 20px; }
+.tbl-bar { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.tbl-bar h2 { font-size: 13px; font-weight: 600; color: var(--t1); margin-right: auto; }
+.tbl-bar h2 span { font-weight: 400; color: var(--t3); margin-left: 4px; }
+.prow { display: grid; grid-template-columns: 28px 80px 1fr 90px 170px 90px; align-items: center; height: 38px; padding: 0 10px; border-top: 1px solid var(--line); }
+.prow .cost { font-size: 12px; color: var(--t2); }
+.prow .cost span { color: var(--t3); }
+.prow:first-of-type { border-top: 0; }
+.prow.hd { height: 30px; font-size: 11.5px; font-weight: 600; color: var(--t3); border-top: 0; border-bottom: 1px solid var(--line); }
+.prow.sel { background: var(--hover); }
+.prow[data-i]:hover { background: var(--hover); }
+.prow .v { color: var(--t1); font-weight: 600; }
+.prow .b { color: var(--t3); font-size: 12px; }
+.prow .st { color: var(--gold); font-size: 12px; }
+.chk { width: 14px; height: 14px; border: 1px solid #45505d; border-radius: 2px; position: relative; }
+.prow.sel .chk { background: var(--gold); border-color: var(--gold); }
+.prow.sel .chk::after { content: ''; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid #0b0f14; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.tbl .note { padding: 10px 12px; font-size: 12px; color: var(--t3); border-top: 1px solid var(--line); line-height: 1.5; }
+
+.form { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; }
+.frow { display: grid; grid-template-columns: 220px 1fr; gap: 24px; padding: 16px; border-top: 1px solid var(--line); }
+.frow:first-child { border-top: 0; }
+.frow h3 { font-size: 13px; font-weight: 600; color: var(--t1); }
+.frow p { font-size: 12px; color: var(--t3); margin-top: 2px; line-height: 1.5; }
+.inl { display: flex; gap: 6px; align-items: center; }
+.hint { font-size: 12px; color: var(--t3); margin-top: 6px; }
+.hint b { color: var(--gold); font-weight: 600; }
+.hint.bad b { color: var(--loss); }
+.plist { background: var(--bg); border: 1px solid var(--line2); border-radius: 3px; margin-bottom: 6px; max-height: 140px; overflow-y: auto; }
+.plist div { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; font-size: 12.5px; color: var(--t2); cursor: default; }
+.plist div + div { border-top: 1px solid var(--line); }
+.plist div:hover { background: var(--raise); }
+.plist div.sel { background: var(--hover); color: var(--t1); }
+.plist .v { color: var(--t3); font-size: 12px; flex-shrink: 0; }
+.plist .v.err { color: var(--loss); }
+.plist .none { color: var(--t3); }
+.path { flex: 1; min-width: 0; height: 30px; line-height: 28px; padding: 0 10px; font-size: 12.5px; color: var(--t1); background: var(--bg); border: 1px solid var(--line2); border-radius: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.path.unset { color: var(--t3); }
+.legal { font-size: 11.5px; color: var(--t3); line-height: 1.5; margin-top: 10px; max-width: 560px; }
+.cache-info { font-size: 12.5px; color: var(--t2); margin-bottom: 8px; line-height: 1.5; }
+.cache-info span { color: var(--t3); }
+.check { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12.5px; color: var(--t2); cursor: pointer; width: max-content; }
+.check input { width: 14px; height: 14px; accent-color: var(--gold); margin: 0; }
+
+/* setup */
+.setup { display: none; flex: 1; align-items: center; justify-content: center; }
+.setup.on { display: flex; }
+.setup-box { width: 440px; background: var(--panel); border: 1px solid var(--line2); border-radius: 4px; padding: 24px; }
+.setup-box h1 { font-size: 18px; font-weight: 600; color: var(--t1); }
+.setup-box .lead { font-size: 12.5px; color: var(--t3); margin: 4px 0 20px; }
+.fld { margin-bottom: 16px; }
+.fld label { display: block; font-size: 12.5px; font-weight: 600; color: var(--t1); margin-bottom: 6px; }
+.setup-box .btn.primary { width: 100%; justify-content: center; height: 32px; margin-top: 4px; }
+
+/* overlays */
+.ov { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 100; align-items: center; justify-content: center; }
+.ov.on { display: flex; }
+.modal { width: 560px; background: var(--panel); border: 1px solid var(--line2); border-radius: 4px; box-shadow: 0 16px 48px rgba(0,0,0,.5); }
+.modal-h { padding: 12px 16px; font-size: 14px; font-weight: 600; color: var(--t1); border-bottom: 1px solid var(--line); }
+.modal-out { height: 240px; margin: 12px 16px 0; padding: 8px 10px; font: 12px/1.55 Consolas, 'Cascadia Mono', monospace; color: var(--t2); background: var(--bg); border: 1px solid var(--line); border-radius: 3px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; user-select: text; -webkit-user-select: text; }
+.modal-prog { display: none; margin: 12px 16px 0; }
+.modal-prog.on { display: block; }
+.modal-prog .pl { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--t2); margin-bottom: 5px; }
+.modal-prog .pl span:last-child { color: var(--t3); font-variant-numeric: tabular-nums; }
+.pbar { height: 6px; background: var(--bg); border: 1px solid var(--line); border-radius: 2px; overflow: hidden; }
+.pbar i { display: block; height: 100%; width: 0; background: var(--gold); transition: width .15s linear; }
+.modal-f { display: flex; align-items: center; gap: 10px; padding: 12px 16px; }
+.modal-f .working { margin-right: auto; font-size: 12px; color: var(--t3); }
+.cfm { width: 400px; background: var(--panel); border: 1px solid var(--line2); border-radius: 4px; padding: 18px; box-shadow: 0 16px 48px rgba(0,0,0,.5); }
+.cfm p { font-size: 13px; color: var(--t1); line-height: 1.55; margin-bottom: 16px; }
+.cfm .acts { justify-content: flex-end; }
+
+.ctx { display: none; position: fixed; min-width: 190px; background: var(--raise); border: 1px solid var(--line2); border-radius: 3px; box-shadow: 0 8px 24px rgba(0,0,0,.45); z-index: 200; padding: 3px 0; }
+.ctx.on { display: block; }
+.ctx div { padding: 6px 12px; font-size: 12.5px; color: var(--t2); cursor: default; }
+.ctx div:hover { background: var(--hover); color: var(--t1); }
+.ctx div.dis { color: var(--t3); pointer-events: none; }
+.ctx hr { border: 0; height: 1px; background: var(--line2); margin: 3px 0; }
+
+.upd { flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 6px 14px; font-size: 12.5px; color: var(--t1); background: rgba(200,170,110,.1); border-bottom: 1px solid var(--line); }
+.upd span { margin-right: auto; }
+.toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); padding: 7px 14px; font-size: 12.5px; color: var(--t1); background: var(--raise); border: 1px solid var(--line2); border-radius: 3px; opacity: 0; transition: opacity .15s; pointer-events: none; z-index: 300; }
+.toast.on { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="setup-view" class="setup">
+  <div class="setup-box">
+    <h1>L-Recall</h1>
+    <div class="lead">Two things to set before your replays can be played on their original patch.</div>
+    <div class="fld">
+      <label>League of Legends.exe</label>
+      <div class="inl"><div class="path unset" id="su-game">Not selected</div><button class="btn" onclick="pickSuGame()">Browse</button></div>
+    </div>
+    <div class="fld">
+      <label>Patch storage folder</label>
+      <div class="inl"><div class="path unset" id="su-repo">Not selected</div><button class="btn" onclick="pickSuRepo()">Browse</button></div>
+    </div>
+    <button class="btn primary" id="su-save" disabled onclick="saveSu()">Continue</button>
+  </div>
+</div>
+
+<div id="app-view" style="display:none;flex:1;flex-direction:column;min-height:0">
+  <header class="top">
+    <div class="brand">
+      <svg width="14" height="16" viewBox="0 0 16 18" fill="none"><path d="M8 1l6.5 3.75v8.5L8 17l-6.5-3.75v-8.5L8 1z" stroke="currentColor" stroke-width="1.6"/><path d="M8 5.5l3 1.75v3.5L8 12.5l-3-1.75v-3.5L8 5.5z" fill="currentColor"/></svg>
+      L-Recall
+    </div>
+    <nav class="tabs">
+      <button class="on" data-tab="replays">Replays</button>
+      <button data-tab="patches">Patches</button>
+      <button data-tab="settings">Settings</button>
+    </nav>
+    <div class="stat" id="top-stat"></div>
+  </header>
+
+  <div class="upd" id="upd" style="display:none">
+    <span id="upd-txt"></span>
+    <button class="btn primary" onclick="updDownload()">Download</button>
+    <button class="btn" onclick="updLater()">Later</button>
+  </div>
+
+  <section id="replays" class="pnl on">
+    <div class="split">
+      <aside class="list-pane">
+        <div class="list-tools">
+          <input class="input" id="r-srch" type="text" placeholder="Search champion, player, patch, #tag or note" oninput="filterR()" spellcheck="false">
+          <div class="filters" id="filters">
+            <button class="on" data-f="all">All<span id="fc-all"></span></button>
+            <button data-f="win">Wins<span id="fc-win"></span></button>
+            <button data-f="loss">Losses<span id="fc-loss"></span></button>
+            <button data-f="ready">Watchable<span id="fc-ready"></span></button>
+            <button data-f="other">Not played<span id="fc-other"></span></button>
+          </div>
+        </div>
+        <div class="rlist" id="r-list"></div>
+      </aside>
+      <div class="divider" id="divider"></div>
+      <div class="detail" id="detail"></div>
+    </div>
+  </section>
+
+  <section id="patches" class="pnl">
+    <div class="page"><div class="page-in">
+      <div class="ph"><h1>Patches</h1><div class="r"><button class="btn" onclick="addPatch()">Add from install...</button></div></div>
+      <div class="pmeta" id="p-meta"></div>
+      <div id="store"></div>
+      <div class="tbl">
+        <div class="tbl-bar">
+          <h2>Stored<span id="p-count"></span></h2>
+          <button class="btn" id="rst-btn" disabled onclick="restorePatch()">Prepare</button>
+          <button class="btn" id="exp-btn" disabled onclick="expPatches()">Export...</button>
+          <button class="btn danger" id="drop-btn" disabled onclick="dropPatches()">Delete</button>
+        </div>
+        <div class="prow hd"><span></span><span>Patch</span><span>Build</span><span>Replays</span><span title="Total size, and what deleting it would free">Size</span><span></span></div>
+        <div id="p-list"></div>
+      </div>
+      <div class="tbl" id="miss-grp" style="display:none">
+        <div class="tbl-bar"><h2>Needed by replays<span>not stored</span></h2></div>
+        <div class="prow hd"><span></span><span>Patch</span><span>Build</span><span>Replays</span><span></span><span></span></div>
+        <div id="miss-list"></div>
+        <div class="note">A patch can only be stored while it's the installed version. Keep L-Recall running and new patches are stored automatically after each update.</div>
+      </div>
+    </div></div>
+  </section>
+
+  <section id="settings" class="pnl">
+    <div class="page"><div class="page-in">
+      <div class="ph" style="margin-bottom:16px"><h1>Settings</h1></div>
+      <div class="form">
+        <div class="frow">
+          <div><h3>Riot ID</h3><p>Results are shown from this player's side. Comma-separate multiple accounts.</p></div>
+          <div>
+            <div class="inl"><input class="input" id="me-inp" placeholder="Name#TAG" spellcheck="false"><button class="btn" onclick="saveMe()">Save</button></div>
+            <div class="hint" id="me-det"></div>
+          </div>
+        </div>
+        <div class="frow">
+          <div><h3>Replay folders</h3><p>Searched for .rofl files, including subfolders.</p></div>
+          <div>
+            <div class="plist" id="fl-list"></div>
+            <div class="inl"><button class="btn" onclick="addFolder()">Add...</button><button class="btn" id="rm-fl-btn" disabled onclick="rmFolder()">Remove</button></div>
+          </div>
+        </div>
+        <div class="frow">
+          <div><h3>Game installs</h3><p>Checked hourly. New patches are stored after the client finishes updating.</p></div>
+          <div>
+            <div class="plist" id="gp-list"></div>
+            <div class="inl"><button class="btn" onclick="addGP()">Add...</button><button class="btn" id="rm-gp-btn" disabled onclick="rmGP()">Remove</button></div>
+          </div>
+        </div>
+        <div class="frow">
+          <div><h3>Patch storage</h3><p>Folder containing <b>lvcs</b>.</p></div>
+          <div>
+            <div class="inl"><div class="path" id="repo-path"></div><button class="btn" onclick="pickRepo()">Change...</button></div>
+            <div class="hint bad" id="repo-note"></div>
+          </div>
+        </div>
+        <div class="frow">
+          <div><h3>Champion &amp; item icons</h3><p>Kept on disk from Data Dragon so replays load instantly and work offline.</p></div>
+          <div>
+            <div class="cache-info" id="dd-info">...</div>
+            <div class="inl">
+              <button class="btn" onclick="ddDownload()" title="Everything for the current patch, plus the exact icons each of your replays needs from its own patch">Download for my replays</button>
+              <button class="btn" onclick="ddRefresh()" title="Check for a newer patch and fill in anything missing">Refresh</button>
+              <button class="btn danger" onclick="ddClear()">Clear</button>
+            </div>
+            <label class="check"><input type="checkbox" id="dd-auto" onchange="ddAuto(this.checked)"> Download new patch icons automatically</label>
+          </div>
+        </div>
+        <div class="frow">
+          <div><h3>Riot Vanguard</h3><p>Replays from patch 14.9 on need Vanguard running. Older patches play without it.</p></div>
+          <div>
+            <div class="cache-info" id="vg-info">...</div>
+            <p class="legal" style="margin-top:0">L-Recall only reads Vanguard's status. It never starts, stops or changes it. If an old replay crashes, exit Vanguard from its own tray icon (it comes back when you restart), which is the way Riot supports.</p>
+            <div class="inl" style="margin-top:8px"><button class="btn" onclick="openLink('https://support.riotgames.com/en-us/league-of-legends/performance/riot-vanguard-faq-league-of-legends')">Riot's Vanguard FAQ</button></div>
+            <label class="check"><input type="checkbox" id="vg-warn" onchange="vgWarn(this.checked)"> Warn before watching pre-Vanguard replays while Vanguard is on</label>
+          </div>
+        </div>
+        <div class="frow">
+          <div><h3>Updates</h3><p>Checks GitHub for new releases. Nothing about you gets sent.</p></div>
+          <div>
+            <div class="cache-info" id="upd-info">...</div>
+            <div class="inl">
+              <button class="btn" onclick="updCheckNow()">Check now</button>
+              <button class="btn primary" id="upd-get" style="display:none" onclick="updDownload()">Download</button>
+            </div>
+            <label class="check"><input type="checkbox" id="upd-auto" onchange="updAuto(this.checked)"> Check for updates automatically</label>
+          </div>
+        </div>
+        <div class="frow">
+          <div><h3>Uninstall</h3><p>Removes the startup entry, icon cache, settings and program files. Your replay files are never touched.</p></div>
+          <div>
+            <div class="cache-info" id="un-info">...</div>
+            <div class="inl"><button class="btn danger" onclick="uninstallApp()">Uninstall L-Recall...</button></div>
+            <label class="check"><input type="checkbox" id="un-patches"> Also delete stored patches</label>
+          </div>
+        </div>
+        <div class="frow">
+          <div><h3>About</h3><p>Version <span id="about-ver">1.0.0</span> · based on League VCS by Pranav Nutalapati</p></div>
+          <div>
+            <button class="btn" onclick="openLink('https://github.com/EmberLynxe/L-Recall')">GitHub</button>
+            <p class="legal">L-Recall isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.</p>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+</div>
+
+<div class="ov" id="con-ov">
+  <div class="modal">
+    <div class="modal-h" id="con-title">Working</div>
+    <div class="modal-out" id="con-out"></div>
+    <div class="modal-prog" id="con-prog">
+      <div class="pl"><span id="con-plabel"></span><span id="con-pnum"></span></div>
+      <div class="pbar"><i id="con-pfill"></i></div>
+    </div>
+    <div class="modal-f">
+      <span class="working" id="con-sp">Working...</span>
+      <button class="btn" id="con-close" style="display:none;margin-left:auto" onclick="closeCon()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="ov" id="cfm-ov">
+  <div class="cfm">
+    <p id="cfm-msg"></p>
+    <div class="acts">
+      <button class="btn" onclick="cfmRes(false)">Cancel</button>
+      <button class="btn danger" id="cfm-ok" onclick="cfmRes(true)">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="ctx" id="ctx-menu">
+  <div id="cx-watch" onclick="cxAct('watch')">Watch replay</div>
+  <div id="cx-log" onclick="cxAct('log')">Open on League of Graphs</div>
+  <hr>
+  <div onclick="cxAct('explorer')">Show file</div>
+  <div onclick="cxAct('copy')">Copy file path</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// bridge
+const _q = []; let _s = false, _rid = 0; const _cb = {};
+function _flush() {
+  if (_s || !_q.length) return;
+  _s = true;
+  // setTimeout or python's still mid-call and the message vanishes. kill this and the app dies
+  setTimeout(() => { document.title = '​' + _q[0]; }, 0);
+}
+window.__ack = () => { _q.shift(); _s = false; _flush(); };
+window.__respond = r => { const c = _cb[r.id]; if (c) { delete _cb[r.id]; c(r); } };
+window.__console_line = t => { const e = $('con-out'); e.textContent += t; e.scrollTop = e.scrollHeight; };
+// big totals are bytes (optimize), a percentage reads better than 31,122,382,499 / 83,000,000,000
+window.__console_progress = (done, total, label) => {
+  const pct = total ? Math.min(100, done / total * 100) : 0;
+  $('con-prog').classList.add('on');
+  $('con-pfill').style.width = pct.toFixed(1) + '%';
+  $('con-plabel').textContent = label || 'Working';
+  $('con-pnum').textContent = total > 1e6 ? Math.floor(pct) + '%' : done.toLocaleString() + ' / ' + total.toLocaleString();
+};
+window.__console_done = () => { $('con-close').style.display = ''; $('con-sp').style.display = 'none'; };
+function send(action, args) {
+  return new Promise(res => {
+    const id = 'r' + (++_rid);
+    _cb[id] = res;
+    _q.push(JSON.stringify({ id, action, ...args }));
+    _flush();
+  });
+}
+async function call(action, args = {}) {
+  const r = await send(action, args);
+  if (r.error) throw new Error(r.error);
+  return r.data;
+}
+
+// helpers
+const $ = id => document.getElementById(id);
+function esc(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+const fmtK = n => { n = n || 0; return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n); };
+const ratio = (k, d, a) => d === 0 ? 'Perfect' : ((k + a) / d).toFixed(2) + ':1';
+const gb = n => (n / 1073741824).toFixed(1) + ' GB';
+const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('on');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('on'), 1800);
+}
+
+// assets: local cache first, cdn second
+const CDN = 'https://ddragon.leagueoflegends.com/cdn/';
+// MonkeyKing, see assets.py
+const CHAMP_FIX = { Wukong: 'MonkeyKing', FiddleSticks: 'Fiddlesticks' };
+// replays store spell ids, data dragon wants names
+const SPELLS = {1:'SummonerBoost',3:'SummonerExhaust',4:'SummonerFlash',6:'SummonerHaste',7:'SummonerHeal',11:'SummonerSmite',12:'SummonerTeleport',13:'SummonerMana',14:'SummonerDot',21:'SummonerBarrier',32:'SummonerSnowball'};
+let assetBase = '', ddVersions = [];
+const ckey = c => CHAMP_FIX[c] || c;
+function verFor(patch) { return ddVersions.find(v => v === patch || v.startsWith(patch + '.')) || ddVersions[0] || ''; }
+const latest = () => ddVersions[0] || '';
+function imgTag(kind, name, ver, attrs = '') {
+  if (!ver || !name) return '';
+  const cdn = CDN + ver + '/img/' + kind + '/' + name + '.png';
+  const src = assetBase ? assetBase + ver + '/' + kind + '/' + name + '.png' : cdn;
+  return '<img ' + attrs + ' src="' + esc(src) + '"' + (assetBase ? ' data-cdn="' + esc(cdn) + '"' : '') + ' onerror="imgFail(this)">';
+}
+function imgFail(el) {
+  if (el.dataset.cdn) { const u = el.dataset.cdn; el.removeAttribute('data-cdn'); el.src = u; }
+  else el.remove();
+}
+function champIcon(c, ver) {
+  return '<span class="ci" data-n="' + esc((c || '?').slice(0, 2)) + '" title="' + esc(c) + '">' + imgTag('champion', ckey(c), ver || latest()) + '</span>';
+}
+
+// league of graphs
+const LOG_REGION = { NA1: 'na', EUW1: 'euw', EUN1: 'eune', OC1: 'oce', KR: 'kr', JP1: 'jp', BR1: 'br', LA1: 'lan', LA2: 'las', TR1: 'tr', RU: 'ru', SG2: 'sg', PH2: 'ph', TH2: 'th', TW2: 'tw', VN2: 'vn', ME1: 'me' };
+function matchInfo(filename) {
+  const m = /^([A-Za-z]+\d?)[-_](\d+)/.exec(filename || '');
+  if (!m) return null;
+  const platform = m[1].toUpperCase(), region = LOG_REGION[platform];
+  return { platform, id: m[2], log: region ? 'https://www.leagueofgraphs.com/match/' + region + '/' + m[2] : null };
+}
+
+// state
+let config = {}, replays = [], filtReplays = [], stored = [], patches = [];
+let filt = 'all', selRI = -1, detPath = null, repoOk = true;
+let meSet = new Set(), meLabel = '', meSource = '', meCount = 0;
+let selPI = new Set(), selFI = -1, selGI = -1, cxR = null, _cfmCb = null;
+
+// dates
+const dayKey = ts => { const d = new Date(ts * 1000); return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate(); };
+function dayLabel(ts) {
+  if (!ts) return 'Unknown date';
+  const d = new Date(ts * 1000), now = new Date();
+  const diff = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 864e5);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Yesterday';
+  const o = { weekday: 'short', day: 'numeric', month: 'short' };
+  if (d.getFullYear() !== now.getFullYear()) o.year = 'numeric';
+  return d.toLocaleDateString(undefined, o);
+}
+const timeOf = ts => ts ? new Date(ts * 1000).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '';
+const fullDate = ts => ts ? new Date(ts * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) + ', ' + timeOf(ts) : '';
+
+// init
+async function init() {
+  try {
+    const info = await call('init');
+    config = info.config || {};
+    if (!info.configured) $('setup-view').classList.add('on');
+    else showApp();
+  } catch (e) {
+    document.body.innerHTML = '<div style="padding:24px;color:#e3545e;font:13px Consolas,monospace">Couldn\'t start: ' + esc(e.message) + '</div>';
+  }
+}
+async function showApp() {
+  $('setup-view').classList.remove('on');
+  $('app-view').style.display = 'flex';
+  try { const w = localStorage.getItem('listW'); if (w) document.documentElement.style.setProperty('--list-w', w + 'px'); } catch (e) {}
+  renderEmptyDetail();
+  try {
+    const a = await call('get_assets');
+    assetBase = a.base || ''; ddVersions = a.versions || [];
+  } catch (e) {
+    try { ddVersions = (await (await fetch('https://ddragon.leagueoflegends.com/api/versions.json')).json()).filter(v => /^\d/.test(v)); } catch (e2) {}
+  }
+  loadR();
+  checkUpdate(false);
+}
+
+// setup
+let suGame = null, suRepo = null;
+async function pickSuGame() {
+  const p = await call('pick_file', { title: 'Select League of Legends.exe', wildcard: 'League of Legends.exe|League of Legends.exe' });
+  if (p) { suGame = p; $('su-game').textContent = p; $('su-game').classList.remove('unset'); }
+  $('su-save').disabled = !(suGame && suRepo);
+}
+async function pickSuRepo() {
+  const p = await call('pick_directory', { title: 'Choose where to store patches' });
+  if (p) { suRepo = p; $('su-repo').textContent = p; $('su-repo').classList.remove('unset'); }
+  $('su-save').disabled = !(suGame && suRepo);
+}
+async function saveSu() {
+  await call('save_setup', { game_path: suGame, repository: suRepo });
+  try { config = await call('get_config'); } catch (e) { return; }
+  showApp();
+}
+
+// tabs
+function showTab(name) {
+  document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === name));
+  document.querySelectorAll('.pnl').forEach(p => p.classList.toggle('on', p.id === name));
+  if (name === 'patches') loadP();
+  if (name === 'settings') loadSettings();
+}
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+
+// who am i
+const pkey = p => ((p.n ?? p.name ?? '') + '#' + (p.t ?? p.tag ?? '')).toLowerCase();
+function computeMe() {
+  meSet = new Set(); meLabel = ''; meSource = ''; meCount = 0;
+  const manual = (config.player_names || []).map(s => s.trim().toLowerCase()).filter(Boolean);
+  if (manual.length) { manual.forEach(m => meSet.add(m)); meSource = 'manual'; meLabel = config.player_names.join(', '); return; }
+  const counts = {}, labels = {};
+  let n = 0;
+  for (const r of replays) {
+    if (!r.players.length) continue;
+    n++;
+    for (const p of r.players) { const k = pkey(p); counts[k] = (counts[k] || 0) + 1; labels[k] = p.t ? p.n + '#' + p.t : p.n; }
+  }
+  let best = null;
+  for (const k in counts) if (!best || counts[k] > counts[best]) best = k;
+  if (best && counts[best] >= 2 && counts[best] >= n * 0.2) { meSet.add(best); meLabel = labels[best]; meSource = 'auto'; meCount = counts[best]; }
+}
+function isMe(p) {
+  if (!meSet.size) return false;
+  return meSet.has(pkey(p)) || meSet.has((p.n ?? p.name ?? '').toLowerCase());
+}
+const resultOf = r => r._me ? (r._me.win ? 'win' : 'loss') : null;
+
+// replay list
+async function loadR() {
+  $('r-list').innerHTML = '<div style="height:10px"></div>' + '<div class="skel"></div>'.repeat(10);
+  try {
+    const data = await call('get_replays');
+    replays = data.replays || [];
+    stored = data.stored || [];
+    repoOk = data.repo_ok !== false;
+    allTags = data.all_tags || [];
+    config.replay_folders = data.folders || [];
+  } catch (e) { replays = []; }
+  computeMe();
+  for (const r of replays) r._me = r.players.find(isMe) || null;
+  updateTopStat();
+  filterR();
+  if (detPath && !replays.some(r => r.path === detPath)) renderEmptyDetail();
+}
+function updateTopStat() {
+  $('top-stat').innerHTML = '<span><b>' + replays.length + '</b> replays</span>' +
+    (repoOk ? '<span><b>' + stored.length + '</b> patches stored</span>'
+            : '<span class="warn" onclick="showTab(\'settings\')">Patch storage not found</span>');
+}
+
+$('filters').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  filt = b.dataset.f;
+  $('filters').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+  filterR();
+});
+
+function matchesQuery(r, q) {
+  if (!q) return true;
+  const tags = (r.tags || []).map(t => t.toLowerCase());
+  if (q.startsWith('#')) return tags.some(t => t.startsWith(q.slice(1)));
+  return r.filename.toLowerCase().includes(q) || r.patch.includes(q) ||
+    tags.some(t => t.includes(q)) || (r.note || '').toLowerCase().includes(q) ||
+    r.players.some(p => p.c.toLowerCase().includes(q) || (p.n || '').toLowerCase().includes(q));
+}
+const tagsInline = r => (r.tags && r.tags.length) ? ' <span class="rtags">' + r.tags.slice(0, 3).map(t => '#' + esc(t)).join(' ') + '</span>' : '';
+function filterR() {
+  const q = $('r-srch').value.trim().toLowerCase();
+  const base = replays.filter(r => matchesQuery(r, q));
+  const c = { all: base.length, win: 0, loss: 0, ready: 0, other: 0 };
+  for (const r of base) { const x = resultOf(r); if (x) c[x]++; else c.other++; if (r.status === 'Ready') c.ready++; }
+  for (const k in c) $('fc-' + k).textContent = c[k];
+  $('filters').querySelector('[data-f=other]').style.display = c.other || filt === 'other' ? '' : 'none';
+  filtReplays = base.filter(r =>
+    filt === 'all' || (filt === 'ready' ? r.status === 'Ready' : filt === 'other' ? !r._me : resultOf(r) === filt));
+  renderR();
+}
+
+function renderR() {
+  const el = $('r-list');
+  selRI = -1;
+  if (!filtReplays.length) {
+    el.innerHTML = replays.length
+      ? '<div class="empty"><b>No matches</b>Try a different search or filter.</div>'
+      : '<div class="empty"><b>No replays found</b>Download replays from match history in the League client, or add a folder in Settings.</div>';
+    return;
+  }
+  const days = {};
+  for (const r of filtReplays) {
+    const d = days[dayKey(r.ts)] || (days[dayKey(r.ts)] = { w: 0, l: 0 });
+    const x = resultOf(r); if (x === 'win') d.w++; else if (x === 'loss') d.l++;
+  }
+  let h = '', last = null;
+  filtReplays.forEach((r, i) => {
+    const k = dayKey(r.ts);
+    if (k !== last) {
+      last = k;
+      const d = days[k];
+      h += '<div class="day"><span>' + esc(dayLabel(r.ts)) + '</span>' + (d.w + d.l ? '<span class="rec">' + d.w + 'W ' + d.l + 'L</span>' : '') + '</div>';
+    }
+    if (r.path === detPath) selRI = i;
+    h += rowHTML(r, i, r.path === detPath);
+  });
+  el.innerHTML = h;
+}
+
+function rowHTML(r, i, sel) {
+  const me = r._me, res = resultOf(r);
+  const side = '<div class="side"><div class="tm">' + esc(timeOf(r.ts)) + '</div><div class="pt">' + esc(r.patch) +
+    (r.status === 'Ready' ? '' : '<span class="nostore" title="This patch isn\'t stored">not stored</span>') + '</div></div>';
+  if (me) {
+    // both teams like op.gg, blue on top. you get the gold ring
+    const teams = '<div class="tms">' + ['Blue', 'Red'].map(s => '<div>' + r.players.filter(p => p.team === s)
+      .map(p => champIcon(p.c).replace('class="ci"', 'class="ci' + (p === me ? ' me' : '') + '"')).join('') + '</div>').join('') + '</div>';
+    return '<div class="row me ' + res + (sel ? ' sel' : '') + '" data-i="' + i + '">' +
+      '<div><div class="res">' + (res === 'win' ? 'Victory' : 'Defeat') + '</div><div class="dur">' + esc(r.duration) + '</div></div>' +
+      '<div class="champ">' + champIcon(me.c) + (me.lvl ? '<span class="lvl">' + me.lvl + '</span>' : '') + '</div>' +
+      '<div style="min-width:0"><div class="kda">' + me.k + '<i>/</i><span class="d">' + me.d + '</span><i>/</i>' + me.a + tagsInline(r) + '</div>' +
+      '<div class="sub"' + (r.note ? ' title="' + esc(r.note) + '"' : '') + '><b>' + ratio(me.k, me.d, me.a) + '</b>' + (me.d ? ' KDA' : '') +
+      (me.cs ? ' · ' + me.cs + ' CS' : '') + '</div></div>' +
+      teams + side + '</div>';
+  }
+  const blue = r.players.filter(p => p.team === 'Blue'), red = r.players.filter(p => p.team === 'Red');
+  return '<div class="row plain' + (sel ? ' sel' : '') + '" data-i="' + i + '">' +
+    '<div><div class="res">' + (r.players.length ? (r.win ? 'Blue' : 'Red') + ' win' : 'No data') + '</div><div class="dur">' + esc(r.duration) + '</div></div>' +
+    '<div style="min-width:0"><div class="mini">' + blue.map(p => champIcon(p.c)).join('') + '<span class="vs"></span>' + red.map(p => champIcon(p.c)).join('') + '</div>' +
+    '<div class="sub"><span class="notplayed">Not played</span>' + tagsInline(r) + '</div></div>' +
+    side + '</div>';
+}
+
+$('r-list').addEventListener('click', e => { const row = e.target.closest('.row'); if (row) openDetail(+row.dataset.i); });
+$('r-list').addEventListener('dblclick', e => { const row = e.target.closest('.row'); if (row) watchPath(filtReplays[+row.dataset.i]); });
+$('r-list').addEventListener('contextmenu', e => {
+  const row = e.target.closest('.row'); if (!row) return;
+  e.preventDefault();
+  const i = +row.dataset.i; openDetail(i); cxR = filtReplays[i];
+  $('cx-watch').classList.toggle('dis', cxR.status !== 'Ready');
+  $('cx-log').classList.toggle('dis', !(matchInfo(cxR.filename) || {}).log);
+  const m = $('ctx-menu');
+  m.style.left = Math.min(e.clientX, innerWidth - 200) + 'px';
+  m.style.top = Math.min(e.clientY, innerHeight - 130) + 'px';
+  m.classList.add('on');
+});
+
+function markSel(i) {
+  selRI = i;
+  document.querySelectorAll('#r-list .row.sel').forEach(x => x.classList.remove('sel'));
+  const row = document.querySelector('#r-list .row[data-i="' + i + '"]');
+  if (row) { row.classList.add('sel'); row.scrollIntoView({ block: 'nearest' }); }
+}
+
+// detail
+function runeImg(id, cls = '') {
+  const info = cur && cur.runes[id];
+  if (!info) return '';
+  const cdn = 'https://ddragon.leagueoflegends.com/cdn/img/' + info.icon;
+  const src = assetBase ? assetBase + 'img/' + info.icon : cdn;
+  return '<img ' + cls + ' src="' + esc(src) + '"' + (assetBase ? ' data-cdn="' + esc(cdn) + '"' : '') + ' title="' + esc(info.name) + '" onerror="imgFail(this)">';
+}
+
+function renderEmptyDetail() {
+  cur = null;
+  detPath = null;
+  $('detail').innerHTML = '<div class="empty">Select a replay</div>';
+}
+
+async function openDetail(i) {
+  const r = filtReplays[i];
+  if (!r) return;
+  markSel(i);
+  if (detPath === r.path) return;
+  detPath = r.path;
+  $('detail').innerHTML = headHTML(r, null) + '<div class="dbody"></div>';
+  try {
+    const d = await call('get_replay_detail', { path: r.path });
+    if (detPath !== r.path) return;
+    const ver = verFor(r.patch);
+    const all = [...(d.blue_team || []), ...(d.red_team || [])];
+    const want = call('ensure_assets', {
+      version: ver,
+      champions: all.map(p => ckey(p.champion)),
+      items: all.flatMap(p => p.items || []).filter(Boolean),
+      spells: all.flatMap(p => p.summoner_spells || []).map(id => SPELLS[id]).filter(Boolean),
+    }).catch(() => {});
+    const runeIds = [...new Set(all.flatMap(p => p.runes ? [...p.runes.perks, p.runes.primary, p.runes.secondary] : []).filter(Boolean))];
+    const runesP = runeIds.length ? call('get_runes', { version: ver, ids: runeIds }).catch(() => ({})) : Promise.resolve({});
+    const timeout = new Promise(res => setTimeout(res, 900));
+    await Promise.race([Promise.all([want, runesP]), timeout]);
+    if (detPath !== r.path) return;
+    const me = all.findIndex(isMe);
+    cur = { r, d, ver, all, runes: {}, tab: cur ? cur.tab : 'score', sel: me >= 0 ? me : 0, noteOpen: false };
+    renderDetail();
+    runesP.then(rt => { if (cur && cur.r === r) { cur.runes = rt || {}; if (cur.tab !== 'breakdown') renderBody(); } });
+  } catch (e) {
+    if (detPath === r.path) $('detail').querySelector('.dbody').innerHTML = '<div class="empty"><b>Couldn\'t read this replay</b>' + esc(e.message) + '</div>';
+  }
+}
+
+let cur = null;
+function renderDetail() {
+  const { r, d } = cur;
+  $('detail').innerHTML = headHTML(r, d) + metaHTML() + '<div id="notebox"></div><div class="dbody" id="dbody"></div>';
+  renderNote();
+  renderBody();
+}
+function renderBody() {
+  const el = $('dbody'); if (!el || !cur) return;
+  const { r, d, tab } = cur;
+  el.innerHTML = tab === 'breakdown' ? breakdownHTML() : tab === 'player' ? playerHTML() : boardHTML(r, d);
+}
+function setTab(t) {
+  cur.tab = t;
+  document.querySelectorAll('.dtabs > button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  renderBody();
+}
+function selPlayer(i) { cur.sel = i; setTab('player'); }
+
+// tags & notes
+let allTags = [];
+function metaHTML() {
+  const { r, tab } = cur;
+  const tags = r.tags || [];
+  return '<div class="dtabs">' +
+    ['score:Scoreboard', 'breakdown:Breakdown', 'player:Player'].map(s => { const [k, l] = s.split(':'); return '<button data-t="' + k + '" class="' + (tab === k ? 'on' : '') + '" onclick="setTab(\'' + k + '\')">' + l + '</button>'; }).join('') +
+    '<div class="tagbar">' + tags.map((t, i) => '<span class="chip">#' + esc(t) + '<button title="Remove tag" onclick="removeTag(' + i + ')">×</button></span>').join('') +
+      '<input class="tag-inp" id="tag-inp" list="tag-list" placeholder="Add tag" maxlength="32" onkeydown="tagKey(event)">' +
+      '<datalist id="tag-list">' + allTags.filter(t => !tags.includes(t)).map(t => '<option value="' + esc(t) + '">').join('') + '</datalist>' +
+      '<button class="btn" onclick="toggleNote()">' + (r.note ? 'Edit note' : 'Add note') + '</button>' +
+    '</div></div>';
+}
+function renderNote() {
+  const box = $('notebox'); if (!box) return;
+  const { r, noteOpen } = cur;
+  box.className = (r.note || noteOpen) ? 'notebox' : '';
+  box.innerHTML = (r.note || noteOpen)
+    ? '<textarea id="note-txt" placeholder="Notes about this game..." onblur="saveNote()">' + esc(r.note || '') + '</textarea>' : '';
+  if (noteOpen && !r.note) $('note-txt').focus();
+}
+function toggleNote() {
+  cur.noteOpen = true; renderNote();
+  const t = $('note-txt'); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); }
+}
+async function persistNote(tags, note) {
+  const r = cur.r;
+  try {
+    const res = await call('set_note', { filename: r.filename, tags, note });
+    r.tags = res.tags; r.note = res.note; allTags = res.all_tags || allTags;
+  } catch (e) { toast(e.message); return; }
+  if (cur && cur.r === r) {
+    const scroll = $('dbody') ? $('dbody').scrollTop : 0;
+    const bodyTab = cur.tab;
+    document.querySelector('.dtabs').outerHTML = metaHTML();
+    if (cur.tab === bodyTab && $('dbody')) $('dbody').scrollTop = scroll;
+  }
+  const i = filtReplays.indexOf(r), row = document.querySelector('#r-list .row[data-i="' + i + '"]');
+  if (row) row.outerHTML = rowHTML(r, i, true);
+}
+function tagKey(e) {
+  if (e.key !== 'Enter') return;
+  const v = e.target.value.trim().replace(/^#/, '');
+  if (!v) return;
+  const tags = [...new Set([...(cur.r.tags || []), v])];
+  persistNote(tags, cur.r.note || '').then(() => { const i = $('tag-inp'); if (i) i.focus(); });
+}
+function removeTag(i) { const tags = [...(cur.r.tags || [])]; tags.splice(i, 1); persistNote(tags, cur.r.note || ''); }
+function saveNote() {
+  const t = $('note-txt'); if (!t || !cur) return;
+  const note = t.value.trim();
+  cur.noteOpen = false;
+  if (note === (cur.r.note || '')) { if (!note) renderNote(); return; }
+  persistNote(cur.r.tags || [], note).then(renderNote);
+}
+
+function headHTML(r, d) {
+  const me = r._me, res = resultOf(r);
+  const full = d ? [...d.blue_team, ...d.red_team].find(isMe) : null;
+  const ver = verFor(r.patch);
+  const mi = matchInfo(r.filename);
+  let title, line2 = '';
+  if (me) {
+    title = '<span class="res">' + (me.win ? 'Victory' : 'Defeat') + '</span><span class="nm">' + esc(me.c) + '</span>';
+    line2 = '<span><b>' + me.k + ' / ' + me.d + ' / ' + me.a + '</b></span><span>' + ratio(me.k, me.d, me.a) + (me.d ? ' KDA' : '') + '</span>';
+    if (full) { const mins = r.length / 60; line2 += '<span><b>' + full.cs + '</b> CS' + (mins ? ' (' + (full.cs / mins).toFixed(1) + '/min)' : '') + '</span>'; }
+  } else {
+    title = '<span class="res">' + (r.players.length ? (r.win ? 'Blue' : 'Red') + ' side won' : 'Replay') + '</span>';
+  }
+  const notice = !me && r.players.length
+    ? '<div class="notice">You didn\'t play in this game' + (meLabel ? ' (' + esc(meLabel) + ' isn\'t on either team)' : '') + '</div>' : '';
+  const icon = me ? '<div class="champ">' + champIcon(me.c, ver) + (me.lvl ? '<span class="lvl">' + me.lvl + '</span>' : '') + '</div>' : '<div></div>';
+  const ready = r.status === 'Ready';
+  return '<div class="dhead ' + (res || '') + '">' + icon +
+    '<div style="min-width:0"><div class="dh1">' + title + '</div>' +
+      (line2 ? '<div class="dh2">' + line2 + '</div>' : '') + notice +
+      '<div class="dh3"><span>' + esc(r.duration) + '</span><span>Patch ' + esc(r.version) + '</span><span title="File time. Replays don\'t record when the game started.">Saved ' + esc(fullDate(r.ts)) + '</span>' + (mi ? '<span>' + esc(mi.platform + ' ' + mi.id) + '</span>' : '') + '</div></div>' +
+    '<div class="acts">' +
+      '<button class="btn primary" ' + (ready ? '' : 'disabled ') + 'onclick="watchDet()">Watch</button>' +
+      (mi && mi.log ? '<button class="btn" onclick="openLink(\'' + mi.log + '\')">League of Graphs</button>' : '') +
+      '<button class="btn" onclick="showFile(detPath)">Show file</button>' +
+    '</div>' +
+    (ready ? '' : '<div class="acts-note">Patch ' + esc(r.patch) + ' isn\'t stored, so this replay can\'t be played.</div>') +
+  '</div>';
+}
+
+function boardHTML(r, d) {
+  if (!d.blue_team || !d.blue_team.length) return '<div class="empty"><b>No scoreboard</b>This replay file doesn\'t include end-of-game stats.</div>';
+  const ver = verFor(r.patch);
+  const all = [...d.blue_team, ...d.red_team];
+  const maxDmg = Math.max(1, ...all.map(p => p.damage_dealt || 0));
+  const mins = (d.length || r.length) / 60;
+  const blueWon = d.blue_win === true;
+  const myTeam = (all.find(isMe) || {}).team;
+  let teams = [{ side: 'Blue', ps: d.blue_team, won: blueWon }, { side: 'Red', ps: d.red_team, won: !blueWon }];
+  if (myTeam === 'Red') teams.reverse();
+  const sum = (ps, f) => ps.reduce((s, p) => s + (p[f] || 0), 0);
+
+  const team = t => {
+    const cls = t.won ? 'win' : 'loss';
+    let h = '<div class="team ' + cls + '"><div class="thead"><span class="res">' + (t.won ? 'Victory' : 'Defeat') + '</span>' +
+      '<span class="who">' + t.side + ' side' + (myTeam ? (t.side === myTeam ? ' (you)' : '') : '') + '</span>' +
+      '<span class="tot"><b>' + sum(t.ps, 'kills') + '</b> kills · <b>' + fmtK(sum(t.ps, 'gold')) + '</b> gold · <b>' + fmtK(sum(t.ps, 'damage_dealt')) + '</b> damage</span></div>' +
+      '<table class="sb"><thead><tr><th>Player</th><th class="c-kda">KDA</th><th class="c-dmg">Damage</th><th class="c-gold n">Gold</th><th class="c-cs n">CS</th><th class="c-vis n">Vision</th><th class="c-items" style="padding-left:14px">Items</th></tr></thead><tbody>';
+    for (const p of t.ps) {
+      const name = p.name ? (p.tag ? p.name + '#' + p.tag : p.name) : '';
+      const sp = (p.summoner_spells || []).map(id => SPELLS[id] ? imgTag('spell', SPELLS[id], ver) : '<span></span>').join('');
+      const it = p.items || [];
+      let items = '';
+      for (let s = 0; s < 6; s++) items += it[s] ? imgTag('item', it[s], ver, 'loading="lazy"') : '<span></span>';
+      items += it[6] ? imgTag('item', it[6], ver, 'class="trk"') : '<span class="trk"></span>';
+      const rn = p.runes || {};
+      const runes = '<div class="runes-mini">' + (runeImg(rn.perks && rn.perks[0]) || '<span></span>') + (runeImg(rn.secondary) || '<span></span>') + '</div>';
+      h += '<tr' + (isMe(p) ? ' class="me"' : '') + ' onclick="selPlayer(' + cur.all.indexOf(p) + ')" title="Show runes and full stats">' +
+        '<td><div class="pl"><div class="champ">' + champIcon(p.champion, ver) + (p.level ? '<span class="lvl">' + p.level + '</span>' : '') + '</div>' +
+          '<div class="spells">' + sp + '</div>' + runes +
+          '<div class="pl-t"><div class="pl-c">' + esc(p.champion) + '</div><div class="pl-n" title="' + esc(name) + '">' + esc(name) + '</div></div></div></td>' +
+        '<td class="c-kda"><div class="kda">' + p.kills + '<i>/</i><span class="d">' + p.deaths + '</span><i>/</i>' + p.assists + '</div><div class="sub">' + ratio(p.kills, p.deaths, p.assists) + '</div></td>' +
+        '<td class="c-dmg">' + (p.damage_dealt || 0).toLocaleString() + '<div class="bar"><i style="width:' + (100 * (p.damage_dealt || 0) / maxDmg).toFixed(1) + '%"></i></div></td>' +
+        '<td class="c-gold n">' + fmtK(p.gold) + '</td>' +
+        '<td class="c-cs n">' + (p.cs || 0) + (mins ? '<div class="sub">' + (p.cs / mins).toFixed(1) + '/m</div>' : '') + '</td>' +
+        '<td class="c-vis n">' + (p.vision_score || 0) + '</td>' +
+        '<td class="c-items" style="padding-left:14px"><div class="items">' + items + '</div></td></tr>';
+    }
+    return h + '</tbody></table></div>';
+  };
+
+  const mb = d.file_size ? (d.file_size / 1048576).toFixed(1) + ' MB' : '';
+  return team(teams[0]) + team(teams[1]) + '<div class="dfoot">' + esc(r.filename) + (mb ? ' · ' + mb : '') + '</div>';
+}
+
+// breakdown
+const S = (p, k) => (p.stats || {})[k] || 0;
+const num = n => (n || 0).toLocaleString();
+const mmss = s => Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0');
+function teamSplit() {
+  const { d } = cur;
+  const myTeam = (cur.all.find(isMe) || {}).team;
+  let a = { side: 'Blue', ps: d.blue_team }, b = { side: 'Red', ps: d.red_team };
+  if (myTeam === 'Red') [a, b] = [b, a];
+  a.label = myTeam ? 'Your team' : 'Blue side';
+  b.label = myTeam ? 'Enemy team' : 'Red side';
+  return [a, b];
+}
+function breakdownHTML() {
+  if (!cur.d.blue_team || !cur.d.blue_team.length) return '<div class="empty">No stats in this replay.</div>';
+  const [A, B] = teamSplit(), ver = cur.ver;
+  const sum = (ps, f) => ps.reduce((s, p) => s + f(p), 0);
+  const cmp = (label, f, fmt = String) => {
+    const a = sum(A.ps, f), b = sum(B.ps, f), t = (a + b) || 1;
+    return '<div><div class="cmp-l"><b>' + fmt(a) + '</b><span>' + label + '</span><b>' + fmt(b) + '</b></div>' +
+      '<div class="split-bar"><i class="ta" style="width:' + (100 * a / t).toFixed(1) + '%"></i><i class="tb" style="flex:1"></i></div></div>';
+  };
+  const chart = (title, sub, fn, fmt, parts) => {
+    const everyone = [...A.ps, ...B.ps];
+    const max = Math.max(1, ...everyone.map(fn));
+    let rows = '';
+    [A, B].forEach((T, ti) => T.ps.forEach((p, j) => {
+      const bar = parts
+        ? parts.map(([pf, cls]) => '<i class="' + cls + '" style="width:' + (100 * pf(p) / max).toFixed(2) + '%"></i>').join('')
+        : '<i class="' + (ti ? 'tb' : 'ta') + '" style="width:' + (100 * fn(p) / max).toFixed(2) + '%"></i>';
+      rows += '<div class="crow' + (ti && !j ? ' gap' : '') + (isMe(p) ? ' me' : '') + '" title="' + esc(p.champion + (p.name ? ' · ' + p.name : '')) + '">' +
+        champIcon(p.champion, ver) + '<div class="cbar">' + bar + '</div><span class="v">' + fmt(fn(p)) + '</span></div>';
+    }));
+    return '<div class="chart"><h4>' + title + '<span>' + (sub || '') + '</span></h4>' + rows + '</div>';
+  };
+  const dmgParts = [[p => S(p, 'phys_dealt'), 'phys'], [p => S(p, 'magic_dealt'), 'magic'], [p => S(p, 'true_dealt'), 'truedmg']];
+  const takenParts = [[p => S(p, 'phys_taken'), 'phys'], [p => S(p, 'magic_taken'), 'magic'], [p => S(p, 'true_taken'), 'truedmg']];
+  const types = '<span class="legend" style="margin:0;display:inline-flex"><span style="--c:#d9884c">Physical</span><span style="--c:#8f73f0">Magic</span><span style="--c:#d8dde3">True</span></span>';
+  return '<div class="legend"><span style="--c:var(--win)">' + A.label + '</span><span style="--c:var(--loss)">' + B.label + '</span></div>' +
+    '<div class="cmp">' +
+      cmp('Kills', p => p.kills) + cmp('Gold', p => p.gold, fmtK) + cmp('Damage to champions', p => p.damage_dealt, fmtK) +
+      cmp('Turrets', p => S(p, 'turrets')) + cmp('Dragons', p => S(p, 'dragons')) + cmp('Barons', p => S(p, 'barons')) +
+      cmp('Void grubs', p => S(p, 'grubs')) + cmp('Vision score', p => p.vision_score) +
+    '</div><div class="charts">' +
+      chart('Damage to champions', types, p => p.damage_dealt, fmtK, dmgParts) +
+      chart('Damage taken', types, p => S(p, 'phys_taken') + S(p, 'magic_taken') + S(p, 'true_taken'), fmtK, takenParts) +
+      chart('Gold earned', '', p => p.gold, fmtK) +
+      chart('Creep score', '', p => p.cs, String) +
+      chart('Vision score', '', p => p.vision_score, String) +
+      chart('Damage mitigated', '', p => S(p, 'mitigated'), fmtK) +
+      chart('Healing and shielding', 'self + allies', p => S(p, 'heal') + S(p, 'shield_team'), fmtK) +
+      chart('Crowd control', 'seconds', p => S(p, 'cc_time'), String) +
+      chart('Damage to objectives', '', p => S(p, 'dmg_objectives'), fmtK) +
+    '</div>';
+}
+
+// player
+const POS = { TOP: 'Top', JUNGLE: 'Jungle', MIDDLE: 'Mid', BOTTOM: 'Bot', UTILITY: 'Support' };
+const SHARDS = { 5001: 'Health scaling', 5002: 'Armor', 5003: 'Magic resist', 5005: 'Attack speed', 5007: 'Ability haste', 5008: 'Adaptive force', 5010: 'Move speed', 5011: 'Health', 5013: 'Tenacity & slow resist' };
+function playerHTML() {
+  if (!cur.all.length) return '<div class="empty">No stats in this replay.</div>';
+  const [A, B] = teamSplit(), ver = cur.ver;
+  const p = cur.all[cur.sel] || cur.all[0];
+  const opp = cur.all.find(q => q.team !== p.team && q.position && q.position === p.position) || null;
+  const mins = (cur.d.length || cur.r.length) / 60 || 1;
+  const teamOf = q => cur.all.filter(x => x.team === q.team);
+  const teamKills = q => teamOf(q).reduce((s, x) => s + x.kills, 0) || 1;
+  const teamDmg = q => teamOf(q).reduce((s, x) => s + (x.damage_dealt || 0), 0) || 1;
+
+  const icon = (q, i) => '<span onclick="selPlayer(' + cur.all.indexOf(q) + ')">' + champIcon(q.champion, ver).replace('class="ci"', 'class="ci' + (q === p ? ' on' : '') + '"') + '</span>';
+  const strip = '<div class="psel">' + A.ps.map(icon).join('') + '<span class="vs"></span>' + B.ps.map(icon).join('') + '</div>';
+
+  const rn = p.runes || {};
+  const rinfo = id => cur.runes[id] || null;
+  const rune = (id, key) => {
+    const info = rinfo(id);
+    if (!info) return id ? '<div class="rune"><span></span><div><b>Rune ' + id + '</b></div></div>' : '';
+    const desc = info.desc.length > 120 ? info.desc.slice(0, 117) + '...' : info.desc;
+    return '<div class="rune' + (key ? ' key' : '') + '">' + runeImg(id) + '<div><b>' + esc(info.name) + '</b><small>' + esc(desc) + '</small></div></div>';
+  };
+  const tree = id => rinfo(id) ? '<div class="rtree">' + runeImg(id) + esc(rinfo(id).name) + '</div>' : '';
+  const perks = rn.perks || [];
+  const runesCard = '<div class="card"><h4>Runes</h4>' +
+    (perks[0] ? tree(rn.primary) + rune(perks[0], true) + rune(perks[1]) + rune(perks[2]) + rune(perks[3]) +
+      '<div class="rsep"></div>' + tree(rn.secondary) + rune(perks[4]) + rune(perks[5]) +
+      '<div class="rsep"></div><div class="shards">' + (rn.shards || []).filter(Boolean).map(s => '<span>' + esc(SHARDS[s] || 'Shard ' + s) + '</span>').join('') + '</div>'
+      : '<div class="empty" style="padding:12px">No rune data in this replay.</div>') + '</div>';
+
+  const G = [
+    ['Combat', [
+      ['KDA ratio', q => (q.kills + q.assists) / Math.max(1, q.deaths), v => v.toFixed(2), 1],
+      ['Kill participation', q => 100 * (q.kills + q.assists) / teamKills(q), v => Math.round(v) + '%', 1],
+      ['Largest killing spree', q => S(q, 'spree'), String, 1],
+      ['Double / triple / quadra / penta', q => S(q, 'double') + S(q, 'triple') + S(q, 'quadra') + S(q, 'penta'), (v, q) => [S(q, 'double'), S(q, 'triple'), S(q, 'quadra'), S(q, 'penta')].join(' / '), 1],
+      ['Time spent dead', q => S(q, 'time_dead'), mmss, -1],
+      ['Longest life', q => S(q, 'longest_life'), mmss, 1],
+    ]],
+    ['Damage', [
+      ['To champions', q => q.damage_dealt || 0, num, 1],
+      ['Per minute', q => (q.damage_dealt || 0) / mins, v => Math.round(v).toLocaleString(), 1],
+      ['Share of team', q => 100 * (q.damage_dealt || 0) / teamDmg(q), v => v.toFixed(1) + '%', 1],
+      ['Physical', q => S(q, 'phys_dealt'), num, 0],
+      ['Magic', q => S(q, 'magic_dealt'), num, 0],
+      ['True', q => S(q, 'true_dealt'), num, 0],
+      ['Largest critical strike', q => S(q, 'largest_crit'), num, 1],
+    ]],
+    ['Defence & utility', [
+      ['Damage taken', q => S(q, 'phys_taken') + S(q, 'magic_taken') + S(q, 'true_taken'), num, 0],
+      ['Damage mitigated', q => S(q, 'mitigated'), num, 1],
+      ['Healing', q => S(q, 'heal'), num, 1],
+      ['Healing on allies', q => S(q, 'heal_team'), num, 1],
+      ['Shielding on allies', q => S(q, 'shield_team'), num, 1],
+      ['Crowd control (s)', q => S(q, 'cc_time'), String, 1],
+    ]],
+    ['Income', [
+      ['Gold earned', q => q.gold || 0, num, 1],
+      ['Gold per minute', q => (q.gold || 0) / mins, v => Math.round(v).toLocaleString(), 1],
+      ['Gold spent', q => S(q, 'gold_spent'), num, 0],
+      ['Creep score', q => q.cs || 0, String, 1],
+      ['CS per minute', q => (q.cs || 0) / mins, v => v.toFixed(1), 1],
+      ['Level', q => q.level || 0, String, 1],
+    ]],
+    ['Vision', [
+      ['Vision score', q => q.vision_score || 0, String, 1],
+      ['Vision per minute', q => (q.vision_score || 0) / mins, v => v.toFixed(2), 1],
+      ['Wards placed', q => S(q, 'wards_placed'), String, 1],
+      ['Wards destroyed', q => S(q, 'wards_killed'), String, 1],
+      ['Control wards bought', q => S(q, 'control_wards'), String, 1],
+    ]],
+    ['Objectives', [
+      ['Turret takedowns', q => S(q, 'turrets'), String, 1],
+      ['Damage to buildings', q => S(q, 'dmg_buildings'), num, 1],
+      ['Damage to objectives', q => S(q, 'dmg_objectives'), num, 1],
+      ['Dragons', q => S(q, 'dragons'), String, 1],
+      ['Barons', q => S(q, 'barons'), String, 1],
+      ['Void grubs', q => S(q, 'grubs'), String, 1],
+      ['Objectives stolen', q => S(q, 'steals'), String, 1],
+    ]],
+    ['Abilities', [
+      ['Q casts', q => S(q, 'q_casts'), num, 0],
+      ['W casts', q => S(q, 'w_casts'), num, 0],
+      ['E casts', q => S(q, 'e_casts'), num, 0],
+      ['R casts', q => S(q, 'r_casts'), num, 0],
+    ]],
+  ];
+  const groups = G.map(([title, rows]) =>
+    '<div class="card"><h4>' + title + '</h4>' +
+      '<div class="srow hd"><span></span><span>' + esc(p.champion) + '</span><span>' + (opp ? esc(opp.champion) : '') + '</span></div>' +
+      rows.map(([label, f, fmt, dir]) => {
+        const v = f(p), o = opp ? f(opp) : null;
+        let cls = '';
+        if (opp && dir && v !== o && Math.abs(v - o) > Math.max(Math.abs(o), 1) * 0.05) cls = (v - o) * dir > 0 ? ' up' : ' down';
+        return '<div class="srow"><span class="l">' + label + '</span><span class="v' + cls + '">' + fmt(v, p) + '</span><span class="o">' + (opp ? fmt(o, opp) : '') + '</span></div>';
+      }).join('') + '</div>').join('');
+
+  const name = p.name ? (p.tag ? p.name + '#' + p.tag : p.name) : '';
+  const head = '<div class="card" style="margin-bottom:12px;display:flex;align-items:center;gap:12px">' +
+    '<div class="champ">' + champIcon(p.champion, ver).replace('class="ci"', 'class="ci" style="width:44px;height:44px"') + '</div>' +
+    '<div style="min-width:0"><div style="font-size:15px;font-weight:600;color:var(--t1)">' + esc(p.champion) + ' <span style="font-weight:400;color:var(--t3);font-size:12.5px">' + esc(POS[p.position] || '') + '</span></div>' +
+    '<div class="sub" style="font-size:12.5px">' + esc(name) + (opp ? ' · compared with ' + esc(opp.champion) + ' (lane opponent)' : ' · no lane opponent found') + '</div></div>' +
+    '<div style="margin-left:auto;text-align:right"><div class="kda">' + p.kills + '<i>/</i><span class="d">' + p.deaths + '</span><i>/</i>' + p.assists + '</div>' +
+    '<div class="sub">' + ratio(p.kills, p.deaths, p.assists) + ' KDA</div></div></div>';
+  return strip + head + '<div class="pgrid">' + runesCard + '<div class="sgroups">' + groups + '</div></div>';
+}
+
+function watchDet() { const r = replays.find(x => x.path === detPath); if (r) watchPath(r); }
+async function watchPath(r) {
+  if (!r || r.status !== 'Ready') return;
+  try {
+    const pf = await call('replay_preflight', { path: r.path });
+    if (pf.message && !await cfmDlg(pf.message, pf.level === 'block' ? 'Launch anyway' : 'Watch anyway', false)) return;
+  } catch (e) {}
+  openCon('Starting replay');
+  await call('watch_replay', { path: r.path });
+}
+async function showFile(path) {
+  if (!path) return;
+  try { await call('open_explorer', { path }); } catch (e) { toast(e.message); }
+}
+
+// keyboard
+document.addEventListener('keydown', e => {
+  if (!$('replays').classList.contains('on') || $('con-ov').classList.contains('on') || $('cfm-ov').classList.contains('on')) return;
+  const act = document.activeElement;
+  if (act && (act.tagName === 'TEXTAREA' || (act.tagName === 'INPUT' && act !== $('r-srch')))) return;
+  const inSearch = act === $('r-srch');
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') { e.preventDefault(); $('r-srch').focus(); $('r-srch').select(); return; }
+  if (e.key === 'Escape' && inSearch) { $('r-srch').value = ''; filterR(); $('r-srch').blur(); return; }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    if (!filtReplays.length) return;
+    e.preventDefault();
+    const n = selRI < 0 ? 0 : Math.max(0, Math.min(filtReplays.length - 1, selRI + (e.key === 'ArrowDown' ? 1 : -1)));
+    openDetail(n);
+    if (inSearch) $('r-srch').blur();
+  }
+  if (e.key === 'Enter' && selRI >= 0 && !inSearch) watchPath(filtReplays[selRI]);
+});
+
+// resizable list
+(() => {
+  const dv = $('divider'); let drag = false;
+  dv.addEventListener('mousedown', e => { drag = true; dv.classList.add('drag'); e.preventDefault(); });
+  addEventListener('mousemove', e => {
+    if (!drag) return;
+    const w = Math.max(320, Math.min(innerWidth - 520, e.clientX));
+    document.documentElement.style.setProperty('--list-w', w + 'px');
+  });
+  addEventListener('mouseup', () => {
+    if (!drag) return;
+    drag = false; dv.classList.remove('drag');
+    try { localStorage.setItem('listW', parseInt(getComputedStyle(document.documentElement).getPropertyValue('--list-w'))); } catch (e) {}
+  });
+})();
+
+// context menu
+function cxAct(a) {
+  closeCx();
+  if (!cxR) return;
+  if (a === 'watch') watchPath(cxR);
+  if (a === 'log') { const mi = matchInfo(cxR.filename); if (mi && mi.log) openLink(mi.log); }
+  if (a === 'explorer') showFile(cxR.path);
+  if (a === 'copy') call('copy_clipboard', { text: cxR.path }).then(() => toast('Path copied'));
+}
+function closeCx() { $('ctx-menu').classList.remove('on'); }
+document.addEventListener('click', closeCx);
+addEventListener('blur', closeCx);
+
+// patches
+async function loadP() {
+  loadStorage();
+  $('p-list').innerHTML = '<div class="empty">Loading...</div>';
+  selPI.clear(); updPB();
+  try { patches = await call('get_patches'); } catch (e) { patches = []; }
+  renderP();
+}
+const replayCount = v => replays.filter(r => r.version === v).length;
+const shortV = v => v.split('.').slice(0, 2).join('.');
+function renderP() {
+  $('p-count').textContent = patches.length ? patches.length : '';
+  $('p-list').innerHTML = patches.length ? patches.map((p, i) => {
+    const n = replayCount(p.version);
+    return '<div class="prow' + (selPI.has(i) ? ' sel' : '') + '" data-i="' + i + '"><span class="chk"></span>' +
+      '<span class="v">' + esc(shortV(p.version)) + '</span><span class="b">' + esc(p.version) + '</span>' +
+      '<span>' + (n ? plural(n, 'replay') : '<span class="b">none</span>') + '</span>' +
+      '<span class="cost" data-v="' + esc(p.version) + '">' + costText(p.version) + '</span>' +
+      '<span class="st">' + (p.status === 'Active' ? 'Prepared' : '') + '</span></div>';
+  }).join('') : '<div class="empty">No patches stored yet.</div>';
+  loadCosts();
+
+  const have = new Set(patches.map(p => p.version)), need = {};
+  for (const r of replays) if (r.version && !have.has(r.version)) need[r.version] = (need[r.version] || 0) + 1;
+  const miss = Object.keys(need).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+  $('miss-grp').style.display = miss.length ? '' : 'none';
+  $('miss-list').innerHTML = miss.map(v => '<div class="prow"><span></span><span class="v">' + esc(shortV(v)) + '</span><span class="b">' + esc(v) + '</span><span>' + plural(need[v], 'replay') + '</span><span></span><span></span></div>').join('');
+}
+let costs = {};
+const gbs = n => n >= 1073741824 ? (n / 1073741824).toFixed(1) + ' GB' : (n / 1048576).toFixed(0) + ' MB';
+function costText(v) {
+  const c = costs[v];
+  return c ? gbs(c.total) + ' <span>· frees ' + gbs(c.unique) + '</span>' : '<span>...</span>';
+}
+async function loadCosts() {
+  try { costs = await call('get_patch_costs') || {}; } catch (e) { costs = {}; }
+  document.querySelectorAll('#p-list .cost').forEach(el => { el.innerHTML = costText(el.dataset.v); });
+}
+$('p-list').addEventListener('click', e => {
+  const row = e.target.closest('.prow[data-i]'); if (!row) return;
+  const i = +row.dataset.i;
+  if (e.ctrlKey || e.metaKey || e.target.classList.contains('chk')) { selPI.has(i) ? selPI.delete(i) : selPI.add(i); }
+  else { const only = selPI.size === 1 && selPI.has(i); selPI.clear(); if (!only) selPI.add(i); }
+  document.querySelectorAll('#p-list .prow').forEach(x => x.classList.toggle('sel', selPI.has(+x.dataset.i)));
+  updPB();
+});
+function updPB() {
+  const n = selPI.size;
+  $('drop-btn').disabled = !n; $('exp-btn').disabled = !n; $('rst-btn').disabled = n !== 1;
+  const p = n === 1 ? patches[[...selPI][0]] : null;
+  $('rst-btn').textContent = p && p.status === 'Active' ? 'Clear prepared files' : 'Prepare';
+  $('rst-btn').title = 'Build this patch ahead of time so its replays start instantly';
+}
+const selVersions = () => [...selPI].map(i => patches[i] && patches[i].version).filter(Boolean);
+async function addPatch() {
+  const p = await call('pick_file', { title: 'Select League of Legends.exe', wildcard: 'League of Legends.exe|League of Legends.exe' });
+  if (!p) return;
+  openCon('Storing patch');
+  await call('add_patch', { path: p });
+  loadP(); loadR();
+}
+async function dropPatches() {
+  const v = selVersions(); if (!v.length) return;
+  const n = v.reduce((s, x) => s + replayCount(x), 0);
+  const frees = v.length === 1 && costs[v[0]] ? ' Frees about ' + gbs(costs[v[0]].unique) + '.' : '';
+  if (!await cfmDlg('Delete ' + v.join(', ') + '?' + frees + (n ? ' ' + plural(n, 'replay') + ' will no longer be watchable.' : '') + ' This can\'t be undone.')) return;
+  openCon('Deleting patches');
+  await call('drop_patches', { patches: v });
+  loadP(); loadR();
+}
+async function expPatches() {
+  const v = selVersions(); if (!v.length) return;
+  openCon('Exporting');
+  await call('export_patches', { patches: v });
+  loadP();
+}
+function restorePatch() { const a = [...selPI]; if (a.length === 1) doRestore(a[0]); }
+async function doRestore(i) {
+  const p = patches[i]; if (!p) return;
+  openCon(p.status === 'Active' ? 'Clearing prepared files' : 'Preparing ' + p.version);
+  await call('restore_patch', { patch: p.version });
+  loadP();
+}
+
+// storage
+async function loadStorage() {
+  const el = $('store');
+  el.innerHTML = ''; $('p-meta').textContent = '';
+  let s;
+  try { s = await call('get_storage'); } catch (e) { return; }
+  if (!s.exists) {
+    el.innerHTML = '<div class="banner bad"><div class="txt"><b>Patch storage not found.</b> ' + (s.path ? esc(s.path) + ' isn\'t available.' : '') + '</div><button class="btn" onclick="pickRepo()">Choose folder...</button></div>';
+    return;
+  }
+  $('p-meta').textContent = gb(s.total) + ' used in ' + s.path + ' · ' + gb(s.free) + ' free';
+  if (!s.needs_optimize) return;
+  const old = s.report.filter(r => r.whole).length;
+  el.innerHTML = '<div class="banner"><div class="txt"><b>' + plural(old, 'patch') + ' in the old format.</b> <span id="opt-est">Estimating savings...</span></div>' +
+    '<button class="btn primary" id="opt-btn" disabled onclick="optimizeStorage()">Optimize</button></div>';
+  try {
+    const est = await call('estimate_storage');
+    if (!est) return;
+    $('opt-est').textContent = 'Optimizing brings ' + gb(est.current) + ' down to about ' + gb(est.after) + '. Replays play exactly the same.';
+    $('opt-btn').disabled = false;
+    $('opt-btn').dataset.save = gb(est.current - est.after);
+  } catch (e) { $('opt-est').textContent = ''; }
+}
+async function optimizeStorage() {
+  if (!await cfmDlg('Optimize storage and free about ' + $('opt-btn').dataset.save + '? This takes a while. Every file is checked against the original before the old copy is removed.', 'Optimize', false)) return;
+  openCon('Optimizing storage');
+  await call('optimize_storage');
+  loadP(); loadR();
+}
+async function pickRepo() {
+  const p = await call('pick_directory', { title: 'Choose the folder that contains lvcs' });
+  if (!p) return;
+  try {
+    const r = await call('set_repository', { path: p });
+    config.repository = r.path;
+    toast(r.patches ? 'Found ' + plural(r.patches, 'patch') : 'No patches in that folder yet');
+  } catch (e) { toast(e.message); return; }
+  await loadR();
+  if ($('settings').classList.contains('on')) loadSettings();
+  if ($('patches').classList.contains('on')) loadP();
+}
+
+// settings
+async function loadSettings() {
+  try { config = { ...config, ...(await call('get_config')) }; } catch (e) {}
+  $('me-inp').value = (config.player_names || []).join(', ');
+  $('me-det').innerHTML = meSource === 'auto' ? 'Detected <b>' + esc(meLabel) + '</b> in ' + meCount + ' replays.'
+    : meSource === 'manual' ? '' : 'Not detected yet.';
+  $('repo-path').textContent = config.repository || 'Not set';
+  $('repo-path').classList.toggle('unset', !config.repository);
+  $('repo-note').innerHTML = repoOk ? '' : '<b>Not found.</b> Choose where your storage is now.';
+  renderList('fl-list', (config.replay_folders || []).map(f => ({ label: f })), 'None', i => { selFI = i; $('rm-fl-btn').disabled = false; });
+  renderList('gp-list', (config.game_paths || []).map(p => ({ label: p.path, v: p.version, err: p.error })), 'None found', i => { selGI = i; $('rm-gp-btn').disabled = false; },
+    i => showFile(config.game_paths[i].path));
+  selFI = selGI = -1; $('rm-fl-btn').disabled = $('rm-gp-btn').disabled = true;
+  $('dd-auto').checked = config.auto_download_assets !== false;
+  loadCacheInfo();
+  loadVanguard();
+  loadUpdateInfo();
+  loadUninstallInfo();
+}
+function vgText(v) {
+  if (!v.installed) return 'Not installed.';
+  const state = v.running ? '<b>Running</b>' : '<b>Not running</b>';
+  if (v.mode === 'boot') return state + ' · starts with Windows';
+  if (v.mode === 'on_demand') return state + ' · starts when a Riot game does (Pre-Check)';
+  if (v.mode === 'disabled') return state + ' · disabled, repair it from the Riot Client';
+  return state;
+}
+async function loadVanguard() {
+  try {
+    const v = await call('vanguard_status');
+    $('vg-info').innerHTML = vgText(v);
+    $('vg-warn').checked = v.warn_old !== false;
+  } catch (e) { $('vg-info').textContent = 'Couldn\'t read Vanguard status.'; }
+}
+// updates
+let updInfo = null;
+async function checkUpdate(force) {
+  let res;
+  try { res = await call('check_update', { force }); } catch (e) { return null; }
+  updInfo = res.update;
+  $('about-ver').textContent = res.current;
+  const show = !!res.update && res.update.version !== res.dismissed;
+  $('upd').style.display = show ? '' : 'none';
+  if (show) $('upd-txt').innerHTML = '<b>L-Recall ' + esc(res.update.version) + '</b> is out.';
+  return res;
+}
+function updText(res) {
+  if (!res) return "Couldn't check.";
+  const v = 'Version ' + esc(res.current) + '. ';
+  if (res.update) return v + '<b>' + esc(res.update.version) + '</b> is available.';
+  if (res.latest) return v + "You're up to date.";
+  return v + (res.enabled ? "Couldn't reach GitHub, or there's no release yet." : 'Automatic checks are off.');
+}
+async function loadUpdateInfo() {
+  const res = await checkUpdate(false);
+  $('upd-info').innerHTML = updText(res);
+  $('upd-get').style.display = updInfo ? '' : 'none';
+  $('upd-auto').checked = !res || res.enabled !== false;
+}
+async function updCheckNow() {
+  $('upd-info').textContent = 'Checking...';
+  const res = await checkUpdate(true);
+  $('upd-info').innerHTML = updText(res);
+  $('upd-get').style.display = updInfo ? '' : 'none';
+}
+function updDownload() { openLink(updInfo ? updInfo.url : 'https://github.com/EmberLynxe/L-Recall/releases'); }
+async function updLater() {
+  $('upd').style.display = 'none';
+  if (updInfo) await call('dismiss_update', { version: updInfo.version });
+}
+async function updAuto(on) { await call('set_check_updates', { on }); }
+
+async function vgWarn(on) { await call('set_vanguard_warn', { on }); }
+async function loadCacheInfo() {
+  try {
+    const c = await call('asset_cache');
+    $('dd-info').innerHTML = c.files
+      ? c.files.toLocaleString() + ' files, ' + (c.bytes / 1048576).toFixed(1) + ' MB<br><span>Patches: ' + c.patches.map(esc).join(', ') + '</span>'
+      : 'Nothing cached. Icons load from the internet until downloaded.';
+  } catch (e) { $('dd-info').textContent = ''; }
+}
+async function ddDownload() {
+  openCon('Downloading icons');
+  await call('asset_download');
+  loadCacheInfo();
+}
+async function ddRefresh() {
+  openCon('Refreshing icons');
+  await call('asset_refresh');
+  try { ddVersions = (await call('get_assets')).versions || ddVersions; } catch (e) {}
+  loadCacheInfo();
+}
+async function ddClear() {
+  if (!await cfmDlg('Delete all cached icons? They\'ll load from the internet until downloaded again.', 'Clear')) return;
+  openCon('Clearing icon cache');
+  await call('asset_clear');
+  loadCacheInfo();
+}
+async function loadUninstallInfo() {
+  try {
+    const u = await call('uninstall_info');
+    $('un-info').innerHTML = u.patch_bytes
+      ? 'Stored patches use <b>' + gb(u.patch_bytes) + '</b> in ' + esc(u.repository) + '. They\'re kept unless you tick the box.'
+      : 'No stored patches.';
+    $('un-patches').disabled = !u.patch_bytes;
+    if (!u.patch_bytes) $('un-patches').checked = false;
+  } catch (e) { $('un-info').textContent = ''; }
+}
+async function uninstallApp() {
+  const patches = $('un-patches').checked;
+  const msg = 'Uninstall L-Recall? ' + (patches
+    ? 'Your stored patches get deleted too, so old replays won\'t be watchable any more. '
+    : 'Stored patches are kept, so a future install can pick them up again. ') +
+    'Replay files aren\'t touched. L-Recall closes when it\'s done.';
+  if (!await cfmDlg(msg, 'Uninstall')) return;
+  openCon('Uninstalling');
+  await call('uninstall', { delete_patches: patches });
+}
+async function ddAuto(on) {
+  await call('set_auto_assets', { on });
+  config.auto_download_assets = on;
+}
+function renderList(id, items, empty, onSel, onDbl) {
+  const el = $(id);
+  if (!items.length) { el.innerHTML = '<div class="none">' + empty + '</div>'; el.onclick = el.ondblclick = null; return; }
+  el.innerHTML = items.map((x, i) => '<div data-i="' + i + '"><span title="' + esc(x.label) + '" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(x.label) + '</span>' +
+    (x.v ? '<span class="v' + (x.err ? ' err' : '') + '">' + esc(x.v) + '</span>' : '') + '</div>').join('');
+  el.onclick = e => { const r = e.target.closest('[data-i]'); if (!r) return; el.querySelectorAll('[data-i]').forEach(x => x.classList.toggle('sel', x === r)); onSel(+r.dataset.i); };
+  el.ondblclick = e => { const r = e.target.closest('[data-i]'); if (r && onDbl) onDbl(+r.dataset.i); };
+}
+async function saveMe() {
+  const names = $('me-inp').value.split(',').map(s => s.trim()).filter(Boolean);
+  await call('set_player_names', { names });
+  config.player_names = names;
+  computeMe();
+  for (const r of replays) r._me = r.players.find(isMe) || null;
+  filterR();
+  loadSettings();
+  toast(names.length ? 'Saved' : 'Using auto-detect');
+}
+async function addFolder() {
+  const p = await call('pick_directory', { title: 'Select a replay folder' });
+  if (p) { await call('add_replay_folder', { path: p }); await loadSettings(); loadR(); }
+}
+async function rmFolder() {
+  if (selFI < 0) return;
+  await call('remove_replay_folder', { index: selFI }); await loadSettings(); loadR();
+}
+async function addGP() {
+  const p = await call('pick_file', { title: 'Select League of Legends.exe', wildcard: 'League of Legends.exe|League of Legends.exe' });
+  if (!p) return;
+  try { await call('add_game_path', { path: p }); } catch (e) { toast(e.message); }
+  loadSettings();
+}
+async function rmGP() {
+  if (selGI < 0) return;
+  await call('remove_game_path', { index: selGI }); loadSettings();
+}
+function openLink(url) { call('open_link', { url }); }
+
+// console / confirm
+function openCon(title) {
+  $('con-title').textContent = title;
+  $('con-out').textContent = '';
+  $('con-prog').classList.remove('on');
+  $('con-pfill').style.width = '0';
+  $('con-close').style.display = 'none';
+  $('con-sp').style.display = '';
+  $('con-ov').classList.add('on');
+}
+function closeCon() { $('con-ov').classList.remove('on'); }
+function cfmDlg(msg, ok = 'Delete', danger = true) {
+  $('cfm-ok').textContent = ok;
+  $('cfm-ok').className = 'btn ' + (danger ? 'danger' : 'primary');
+  return new Promise(res => { _cfmCb = res; $('cfm-msg').textContent = msg; $('cfm-ov').classList.add('on'); });
+}
+function cfmRes(v) { $('cfm-ov').classList.remove('on'); if (_cfmCb) { _cfmCb(v); _cfmCb = null; } }
+
+init();
+</script>
+</body>
+</html>
