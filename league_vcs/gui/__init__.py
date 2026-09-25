@@ -66,9 +66,14 @@ class GUI:
             if show_window:
                 wx.CallAfter(self.open_settings)
         else:
-            frame = InitialConfigFrame(self.config, on_complete=self.start_daemon, on_cancel=self.exit)
+            frame = InitialConfigFrame(self.config, on_complete=self._setup_done, on_cancel=self.exit)
             frame.Show()
         self.app.MainLoop()
+
+    def _setup_done(self):
+        # used to only start the tray, so continue looked like it closed the app
+        self.start_daemon()
+        wx.CallAfter(self.open_settings)
 
     def watch(self, replay):
         if not self.config['configured']:
