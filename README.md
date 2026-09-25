@@ -35,11 +35,13 @@ It's new and so far it's only been run on my PC, so if it breaks on yours, [open
 - Tags and notes on any game. Search `#tag` to find them again.
 - A League of Graphs button for every game.
 
-It doesn't copy the whole game folder every patch. Most files don't change between patches, so each one is only stored once. The first patch is a full copy (around 25 to 30 GB), after that it's usually a few GB per patch. My four patches went from 80 GB in the old League VCS format to about 34 GB. Rebuilt game files get checked byte for byte against what Riot shipped.
+It doesn't copy the whole game folder every patch. Most files don't change between patches, so each one is only stored once. The first patch is a full copy (around 25 to 30 GB), after that it's usually a few GB per patch. However, please keep in mind that the older the patch, the more differences there will be in terms of WAD file content.
+
+For example, 4 patches back to back of the past year (16.19-16.15), should stay relatively in the 23-30GB region of size. Add in a patch from let's say 15.15, there's about 10GB that will need to be accounted for (Ionia SR vs Default SR)
 
 ## Setup
 
-1. Grab the zip from [releases](https://github.com/EmberLynxe/L-Recall/releases/latest) and unzip it somewhere, like `%LOCALAPPDATA%\Programs\L-Recall`.
+1. Grab the zip from [releases](https://github.com/EmberLynxe/L-Recall/releases/latest) and unzip it somewhere, like in your desktop as a folder or something lol.
 2. Run `L-Recall.exe`. It finds your League install and replays folder on its own. Pick a folder with a decent amount of free space for storing patches.
 3. Leave it running in the tray. It starts with Windows and grabs new patches after each update.
 
