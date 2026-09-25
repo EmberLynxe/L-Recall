@@ -65,6 +65,7 @@ Easiest is to just leave Vanguard on.
 ## Things to know
 
 - Replay files don't store when the game started, so the date shown is when the file was saved.
+- When there's a new version L-Recall tells you. Hit Update now and it updates itself, or grab the zip from [releases](https://github.com/EmberLynxe/L-Recall/releases/latest) and unzip it over the old one. Your settings and patches stay either way.
 - Coming from League VCS? Point L-Recall at your old storage folder in Settings and hit Optimize on the Patches tab to shrink it. Anything that can't be checked against the original gets left alone.
 - It only connects to two things: Riot's Data Dragon CDN for champion and item icons, and GitHub to check for new versions (you can turn that off in Settings). Nothing about you or your replays gets sent anywhere.
 

@@ -433,7 +433,7 @@ tr.me .pl-n { color: var(--gold); }
   <div class="upd" id="upd" style="display:none">
     <span id="upd-txt"></span>
     <button class="btn primary" id="upd-go" onclick="updInstall()">Update now</button>
-    <button class="btn" onclick="updDownload()">What's new</button>
+    <button class="btn" id="upd-gh" onclick="updDownload()" title="Opens the release page, where you can read what changed and download the zip yourself">Get it from GitHub</button>
     <button class="btn" onclick="updLater()">Later</button>
   </div>
 
@@ -541,6 +541,7 @@ tr.me .pl-n { color: var(--gold); }
             <div class="inl">
               <button class="btn" onclick="updCheckNow()">Check now</button>
               <button class="btn primary" id="upd-get" style="display:none" onclick="updInstall()">Update now</button>
+              <button class="btn" id="upd-get-gh" style="display:none" onclick="updDownload()" title="Opens the release page, where you can read what changed and download the zip yourself">Get it from GitHub</button>
             </div>
             <label class="check"><input type="checkbox" id="upd-auto" onchange="updAuto(this.checked)"> Check for updates automatically</label>
           </div>
@@ -1508,6 +1509,7 @@ async function checkUpdate(force) {
   updInfo = res.update;
   updCanInstall = !!res.can_install;
   $('upd-go').textContent = updCanInstall ? 'Update now' : 'Download';
+  $('upd-gh').style.display = updCanInstall ? '' : 'none';
   $('upd-get').textContent = updCanInstall ? 'Update now' : 'Download';
   $('about-ver').textContent = res.current;
   const show = !!res.update && res.update.version !== res.dismissed;
@@ -1526,6 +1528,7 @@ async function loadUpdateInfo() {
   const res = await checkUpdate(false);
   $('upd-info').innerHTML = updText(res);
   $('upd-get').style.display = updInfo ? '' : 'none';
+  $('upd-get-gh').style.display = updInfo && updCanInstall ? '' : 'none';
   $('upd-auto').checked = !res || res.enabled !== false;
 }
 async function updCheckNow() {
@@ -1533,6 +1536,7 @@ async function updCheckNow() {
   const res = await checkUpdate(true);
   $('upd-info').innerHTML = updText(res);
   $('upd-get').style.display = updInfo ? '' : 'none';
+  $('upd-get-gh').style.display = updInfo && updCanInstall ? '' : 'none';
 }
 function updDownload() { openLink(updInfo ? updInfo.url : 'https://github.com/EmberLynxe/L-Recall/releases'); }
 async function updInstall() {
