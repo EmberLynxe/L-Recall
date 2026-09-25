@@ -34,24 +34,24 @@ class TextConsoleFrame(Frame):
 
         container = wx.BoxSizer()
         hbox = wx.BoxSizer()
-        container.Add(hbox, 0, wx.ALL, 20)
+        container.Add(hbox, 0, wx.ALL, self.FromDIP(20))
 
-        logo_img = wx.Image(icon('icon.png'), wx.BITMAP_TYPE_PNG).Scale(48, 48)
+        logo_img = wx.Image(icon('icon.png'), wx.BITMAP_TYPE_PNG).Scale(self.FromDIP(48), self.FromDIP(48), wx.IMAGE_QUALITY_HIGH)
         logo = wx.StaticBitmap(self, bitmap=logo_img.ConvertToBitmap())
-        hbox.Add(logo, 0, wx.ALIGN_TOP | wx.RIGHT, border=16)
+        hbox.Add(logo, 0, wx.ALIGN_TOP | wx.RIGHT, border=self.FromDIP(16))
 
         self.text_box = text_box = wx.BoxSizer(wx.VERTICAL)
         hbox.Add(text_box)
 
         title_label = theme.styled_text(self, self.title, theme.TEXT_BRIGHT, size=14, bold=True)
-        text_box.Add(title_label, 0, wx.BOTTOM, 8)
+        text_box.Add(title_label, 0, wx.BOTTOM, self.FromDIP(8))
 
-        text = self.text = wx.TextCtrl(self, value='', size=(700, 220),
+        text = self.text = wx.TextCtrl(self, value='', size=self.FromDIP(wx.Size(700, 220)),
                                        style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_DONTWRAP)
         text.SetBackgroundColour(theme.BG_INPUT)
         text.SetForegroundColour(theme.TEXT)
         text.SetFont(wx.Font(9, wx.FONTFAMILY_TELETYPE, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
-        text_box.Add(text, 0, wx.BOTTOM, 12)
+        text_box.Add(text, 0, wx.BOTTOM, self.FromDIP(12))
 
         self.close_btn = wx.Button(self, label='Close')
         self.close_btn.Show(False)

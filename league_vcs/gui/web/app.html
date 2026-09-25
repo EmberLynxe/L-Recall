@@ -356,9 +356,10 @@ tr.me .pl-n { color: var(--gold); }
 .check input { width: 14px; height: 14px; accent-color: var(--gold); margin: 0; }
 
 /* setup */
-.setup { display: none; flex: 1; align-items: center; justify-content: center; }
+/* margin:auto centres it but still scrolls when the window's too short. align-items:center just clips */
+.setup { display: none; flex: 1; min-height: 0; overflow: auto; padding: 16px; }
 .setup.on { display: flex; }
-.setup-box { width: 440px; background: var(--panel); border: 1px solid var(--line2); border-radius: 4px; padding: 24px; }
+.setup-box { width: 100%; max-width: 440px; margin: auto; background: var(--panel); border: 1px solid var(--line2); border-radius: 4px; padding: 24px; }
 .setup-box h1 { font-size: 18px; font-weight: 600; color: var(--t1); }
 .setup-box .lead { font-size: 12.5px; color: var(--t3); margin: 4px 0 20px; }
 .fld { margin-bottom: 16px; }

@@ -5,13 +5,17 @@ import threading
 import webbrowser
 from typing import Optional
 
+# per monitor v2, so dragging a window to a screen with different scaling redraws it properly
 try:
-    ctypes.windll.shcore.SetProcessDpiAwareness(2)
+    ctypes.windll.user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))
 except Exception:
     try:
-        ctypes.windll.user32.SetProcessDPIAware()
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)
     except Exception:
-        pass
+        try:
+            ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass
 
 import win32api
 import win32com.client

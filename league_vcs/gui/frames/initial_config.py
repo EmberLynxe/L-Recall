@@ -7,6 +7,7 @@ import wx.html2
 
 from ..icons import icon
 from ..utils.frame import Frame
+from .settings import _dark_title_bar
 from ... import core
 from ...config import Config
 from ...exceptions import UserInputException
@@ -17,14 +18,24 @@ WEB_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'web')
 
 class InitialConfigFrame(Frame):
     def __init__(self, config: Config, on_complete, on_cancel):
-        super().__init__(None, title='L-Recall - Setup',
-                         size=(520, 420),
-                         style=wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER | wx.MAXIMIZE_BOX))
+        super().__init__(None, title='L-Recall - Setup')
+        self.SetBackgroundColour(wx.Colour(11, 15, 20))
         self.config = config
         self._on_complete = on_complete
         self._on_cancel = on_cancel
 
-        self.webview = wx.html2.WebView.New(self)
+        # dip, not pixels. a fixed 520x420 cut the page off at 150% scaling
+        area = wx.Display(max(wx.Display.GetFromWindow(self), 0)).GetClientArea()
+        want = self.FromDIP(wx.Size(560, 480))
+        self.SetMinSize(self.FromDIP(wx.Size(420, 380)))
+        self.SetSize(min(want.width, int(area.width * .92)), min(want.height, int(area.height * .92)))
+        self.CentreOnScreen()
+        _dark_title_bar(self)
+        self.Bind(wx.EVT_SHOW, lambda e: (wx.CallAfter(_dark_title_bar, self), e.Skip()))
+
+        edge = wx.html2.WebView.IsBackendAvailable(wx.html2.WebViewBackendEdge)
+        self.webview = wx.html2.WebView.New(self, backend=wx.html2.WebViewBackendEdge if edge
+                                            else wx.html2.WebViewBackendDefault)
         sizer = wx.BoxSizer()
         sizer.Add(self.webview, 1, wx.EXPAND)
         self.SetSizer(sizer)
