@@ -521,6 +521,8 @@ tr.me .pl-n { color: var(--gold); }
               <option value="3">Keep 3 patches ready</option><option value="4">Keep 4 patches ready</option></select></div>
             <div class="hint">Going back to a patch that's kept ready is instant. Each one takes about 25 to 30 GB.</div>
             <label class="check"><input type="checkbox" id="quick-chk" onchange="setReplayStart({ quick: this.checked })"> Quick start: only build the champions in the replay (testing)</label>
+            <div class="inl" style="margin-top:10px"><button class="btn" onclick="repackStorage()">Rearrange storage</button></div>
+            <div class="hint">Puts stored pieces in the order they're read, so patches build faster. Takes a while and needs some free space while it runs. Safe to stop.</div>
           </div>
         </div>
         <div class="frow">
@@ -1573,6 +1575,11 @@ async function updLater() {
 }
 async function updAuto(on) { await call('set_check_updates', { on }); }
 
+async function repackStorage() {
+  if (!await cfmDlg('Rearrange stored patches so they build faster? This reads and rewrites your patch storage, so it takes a while. Nothing is lost if it stops halfway.', 'Rearrange', false)) return;
+  openCon('Rearranging storage');
+  await call('repack_storage');
+}
 async function setReplayStart(opts) { await call('set_replay_start', opts); Object.assign(config, opts.keep ? { keep_prepared: opts.keep } : { quick_start: opts.quick }); }
 async function vgWarn(on) { await call('set_vanguard_warn', { on }); }
 async function loadCacheInfo() {

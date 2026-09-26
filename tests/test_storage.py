@@ -218,6 +218,29 @@ class DeleteTest(RepoTest):
         self.assertEqual((linking[0][0], linking[-1]), (0, (50, 50, 'Linking files')))
 
 
+class RepackTest(RepoTest):
+    def test_repack_keeps_every_patch_byte_identical(self):
+        shared = random_assets(30, seed=30, size=(40, 90000))
+        p1 = self.install('p1', {'a.dll': b'one', r'DATA\x.wad.client': ('wad', shared, 30),
+                                 r'DATA\y.wad.client': ('wad', random_assets(20, seed=31, size=(40, 200000)), 31)})
+        p2 = self.install('p2', {'a.dll': b'two', r'DATA\x.wad.client': ('wad', shared[:25] + [b'new' * 5000], 30)})
+        self.repo.add(p1, 'P1')
+        self.repo.add(p2, 'P2')
+        segs = self.repo._segment_hashes()
+        self.repo.repack(log=lambda *_: None)
+        # every shareable piece is bundled now, nothing loose left over
+        loose = set(os.listdir(self.repo.files_dir))
+        self.assertFalse(segs & loose)
+        self.assertTrue(segs <= set(self.repo.packs.index))
+        for tag, inst in (('P1', p1), ('P2', p2)):
+            self.repo.restore(tag)
+            self.assertStagedEqual(inst)
+        # running it again is fine
+        self.repo.repack(log=lambda *_: None)
+        self.repo.restore('P1', clean=True)
+        self.assertStagedEqual(p1)
+
+
 class KeepReadyTest(RepoTest):
     def setUp(self):
         super().setUp()

@@ -132,6 +132,10 @@ def _check_tag(tag):
     return tag
 
 
+def _version_key(tag):
+    return [int(p) if p.isdigit() else 0 for p in tag.split('.')]
+
+
 def _check_manifest(manifest, checksum):
     try:
         if 'segments' in manifest:
@@ -820,6 +824,85 @@ class LargeVCS:
                     else:
                         loose_only.update(e['data_hash'] for e in m['entries'])
         return segs - loose_only
+
+    def repack(self, log=print):
+        """rewrite the bundles so each archive's pieces sit together, in the order a rebuild reads them.
+        rebuilding then reads long straight runs instead of hopping across tens of thousands of files.
+        loose copies only go once their new bundle is written, old bundles only at the very end,
+        so stopping halfway loses nothing"""
+        from .packs import PACK_TARGET
+        self.ensure_repo()
+        with self.lock:
+            packs = self.packs
+            segs = self._segment_hashes()
+            order, seen = [], set()
+            for tag in sorted(self.list(), key=_version_key, reverse=True):
+                wads = sorted(((c, r) for c, r in (self.get_patch(tag) or {}).items() if _is_wad_path(r)),
+                              key=lambda x: x[1].lower())
+                for checksum, _ in wads:
+                    m = _load_manifest(self.files_dir, checksum)
+                    for d, _ in (m or {}).get('segments', ()):
+                        if d and d in segs and d not in seen:
+                            seen.add(d)
+                            order.append(d)
+            if not order:
+                log('Nothing to rearrange.')
+                return
+            old_index = dict(packs.index)
+            old_bundles = sorted({base for base, _, _ in old_index.values()})
+            old_bytes = sum(size for _, _, size in old_index.values())
+            free = shutil.disk_usage(self.files_dir).free
+            if free < old_bytes + MIN_FREE_BYTES:
+                raise ValueError(f'Need about {(old_bytes + MIN_FREE_BYTES) / 1024 ** 3:.0f} GB free to rearrange '
+                                 f'storage (have {free / 1024 ** 3:.1f} GB).')
+            log(f'Rearranging {len(order):,} pieces into playback order...')
+            os.makedirs(packs.dir, exist_ok=True)
+            batch, batch_bytes, loose_done = [], 0, []
+
+            def flush():
+                nonlocal batch_bytes
+                if batch:
+                    packs._write_one(batch)
+                    packs.reload(force=True)
+                    # sealed and indexed, the loose copies can go now
+                    for d in loose_done:
+                        _unlink_blob(os.path.join(self.files_dir, d))
+                batch.clear()
+                loose_done.clear()
+                batch_bytes = 0
+
+            for d in track(order, label='Rearranging storage'):
+                if d in old_index:
+                    base, off, size = old_index[d]
+                    data = bytes(packs._map(base)[off:off + size])
+                    if os.path.exists(os.path.join(self.files_dir, d)):
+                        loose_done.append(d)  # stray loose copy of something already bundled
+                else:
+                    try:
+                        with open(os.path.join(self.files_dir, d), 'rb') as f:
+                            data = f.read()
+                    except FileNotFoundError:
+                        continue
+                    loose_done.append(d)
+                batch.append((d, data))
+                batch_bytes += len(data)
+                if batch_bytes >= PACK_TARGET:
+                    flush()
+            flush()
+
+            # every piece in the old bundles has a new home now
+            packs.close()
+            for base in old_bundles:
+                try:
+                    os.unlink(os.path.join(packs.dir, base + '.idx'))
+                    os.unlink(os.path.join(packs.dir, base + '.pack'))
+                except PermissionError:
+                    pass  # something still has it mapped. idx is gone, next tidy up removes it
+                except FileNotFoundError:
+                    pass
+            packs.reload(force=True)
+            packs._remove_orphans()
+            log(f'Done. {len(order):,} pieces in {len(packs._current_stamp())} bundles.')
 
     def bundle(self, log=print):
         """bundle small files. windows hates hundreds of thousands of tiny files"""

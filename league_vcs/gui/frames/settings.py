@@ -519,6 +519,19 @@ class SettingsFrame(CallbackFrame):
             print(f'{assets.prefetch_latest()} new files. Done.')
         self._run_console_op(req_id, _refresh)
 
+    def _handle_repack_storage(self, req_id, _msg):
+        self._run_console_op(req_id, self._do_repack)
+
+    def _do_repack(self):
+        repo = self._repo_or_none()
+        if repo is None:
+            print('Storage folder not found.')
+            return
+        if winproc.game_running():
+            print('League is running. Close the game (and any replay) first.')
+            return
+        repo.repack()
+
     def _handle_set_replay_start(self, req_id, msg):
         if 'keep' in msg:
             core.keep_prepared = self.config['keep_prepared'] = max(1, min(4, int(msg['keep'])))
