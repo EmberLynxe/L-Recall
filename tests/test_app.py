@@ -65,6 +65,27 @@ class AssetVersionsTest(TempDirTest):
             slow.set()
 
 
+class IconSharingTest(TempDirTest):
+    def test_same_icon_in_two_patches_is_one_file(self):
+        png = b'\x89PNG fake icon'
+        with mock.patch.object(assets, 'ROOT', self.tmp), mock.patch.object(assets, '_get', return_value=png):
+            assets._fetch('16.18.1', 'champion', 'Ahri')
+            assets._fetch('16.19.1', 'champion', 'Ahri')
+            a, b = assets.local_path('16.18.1', 'champion', 'Ahri'), assets.local_path('16.19.1', 'champion', 'Ahri')
+            self.assertTrue(os.path.samefile(a, b))
+
+    def test_old_duplicates_get_merged(self):
+        with mock.patch.object(assets, 'ROOT', self.tmp):
+            for v, data in (('16.17.1', b'same'), ('16.18.1', b'same'), ('16.19.1', b'changed')):
+                os.makedirs(os.path.join(self.tmp, v, 'item'))
+                with open(os.path.join(self.tmp, v, 'item', '3031.png'), 'wb') as f:
+                    f.write(data)
+            self.assertEqual(assets.share_duplicates(), 1)
+            p = lambda v: os.path.join(self.tmp, v, 'item', '3031.png')
+            self.assertTrue(os.path.samefile(p('16.17.1'), p('16.18.1')))
+            self.assertFalse(os.path.samefile(p('16.18.1'), p('16.19.1')))
+
+
 class SigningTest(TempDirTest):
     def game(self, *names):
         for n in names:

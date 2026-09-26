@@ -1,4 +1,5 @@
 """data dragon icon cache. per patch because old items look different"""
+import hashlib
 import json
 import os
 import re
@@ -114,10 +115,76 @@ def _fetch(version, kind, name):
     if os.path.exists(dst):
         return False
     try:
-        _save(dst, _get(f'{CDN}/cdn/{version}/img/{kind}/{name}.png'))
-        return True
+        data = _get(f'{CDN}/cdn/{version}/img/{kind}/{name}.png')
     except Exception:
         return False
+    same = _same_icon_elsewhere(version, kind, name, data)
+    if same:
+        try:
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            os.link(same, dst)
+            return True
+        except OSError:
+            pass
+    _save(dst, data)
+    return True
+
+
+def _same_icon_elsewhere(version, kind, name, data):
+    """most icons don't change between patches. if another patch's folder already has this exact
+    picture, share that file instead of keeping one more copy"""
+    try:
+        others = [v for v in os.listdir(ROOT) if v != version and v[:1].isdigit()]
+    except OSError:
+        return None
+    for v in others:
+        path = os.path.join(ROOT, v, kind, f'{name}.png')
+        try:
+            if os.path.getsize(path) == len(data):
+                with open(path, 'rb') as f:
+                    if f.read() == data:
+                        return path
+        except OSError:
+            continue
+    return None
+
+
+def share_duplicates():
+    """one pass over the cache: identical icons in different patch folders become one file.
+    returns how many copies got merged"""
+    groups = {}
+    for v in (d for d in os.listdir(ROOT) if d[:1].isdigit()) if os.path.isdir(ROOT) else ():
+        for kind in ('champion', 'item', 'spell'):
+            folder = os.path.join(ROOT, v, kind)
+            if os.path.isdir(folder):
+                for f in os.listdir(folder):
+                    groups.setdefault((kind, f), []).append(os.path.join(folder, f))
+    merged = 0
+    for paths in groups.values():
+        if len(paths) < 2:
+            continue
+        seen = {}
+        for path in paths:
+            try:
+                st = os.stat(path)
+                with open(path, 'rb') as f:
+                    key = hashlib.sha256(f.read()).digest()
+            except OSError:
+                continue
+            first = seen.setdefault(key, (path, st))
+            if first[0] == path or os.path.samestat(first[1], st):
+                continue
+            tmp = path + '.link.tmp'
+            try:
+                os.link(first[0], tmp)
+                os.replace(tmp, path)
+                merged += 1
+            except OSError:
+                try:
+                    os.unlink(tmp)
+                except OSError:
+                    pass
+    return merged
 
 
 def ensure(version, champions=(), items=(), spells=()):
