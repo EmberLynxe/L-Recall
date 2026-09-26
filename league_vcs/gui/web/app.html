@@ -476,12 +476,12 @@ tr.me .pl-n { color: var(--accent); }
           <button class="btn" id="exp-btn" disabled onclick="expPatches()">Export...</button>
           <button class="btn danger" id="drop-btn" disabled onclick="dropPatches()">Delete</button>
         </div>
-        <div class="prow hd"><span></span><span>Patch</span><span>Build</span><span>Replays</span><span title="Total size, and what deleting it would free">Size</span><span></span></div>
+        <div class="prow hd"><span></span><span>Patch</span><span></span><span>Replays</span><span title="Total size, and what deleting it would free">Size</span><span></span></div>
         <div id="p-list"></div>
       </div>
       <div class="tbl" id="miss-grp" style="display:none">
         <div class="tbl-bar"><h2>Needed by replays<span>not stored</span></h2></div>
-        <div class="prow hd"><span></span><span>Patch</span><span>Build</span><span>Replays</span><span></span><span></span></div>
+        <div class="prow hd"><span></span><span>Patch</span><span></span><span>Replays</span><span></span><span></span></div>
         <div id="miss-list"></div>
         <div class="note">A patch can only be stored while it's the installed version. Keep L-Recall running and new patches are stored automatically after each update.</div>
       </div>
@@ -1155,7 +1155,7 @@ function headHTML(r, d) {
   return '<div class="dhead ' + (res || '') + '">' + icon +
     '<div style="min-width:0"><div class="dh1">' + title + '</div>' +
       (line2 ? '<div class="dh2">' + line2 + '</div>' : '') + notice +
-      '<div class="dh3"><span>' + esc(r.duration) + '</span><span>Patch ' + esc(r.version) + '</span><span title="File time. Replays don\'t record when the game started.">Saved ' + esc(fullDate(r.ts)) + '</span>' + (mi ? '<span>' + esc(mi.platform + ' ' + mi.id) + '</span>' : '') + '</div></div>' +
+      '<div class="dh3"><span>' + esc(r.duration) + '</span><span>Patch ' + esc(r.patch) + '</span><span title="File time. Replays don\'t record when the game started.">Saved ' + esc(fullDate(r.ts)) + '</span>' + (mi ? '<span>' + esc(mi.platform + ' ' + mi.id) + '</span>' : '') + '</div></div>' +
     '<div class="acts">' +
       '<button class="btn primary" ' + (ready ? '' : 'disabled ') + 'onclick="watchDet()">Watch</button>' +
       (mi && mi.log ? '<button class="btn" onclick="openLink(\'' + mi.log + '\')">League of Graphs</button>' : '') +
@@ -1445,26 +1445,38 @@ async function loadP() {
   try { patches = await call('get_patches'); } catch (e) { patches = []; }
   renderP();
 }
-// replays each stored build ends up playing, same patch builds included
-const replayCount = v => replays.filter(r => (r.client || r.version) === v).length;
 const shortV = v => v.split('.').slice(0, 2).join('.');
+// one row per patch. every stored build of 16.19 is just 16.19, the app picks the right build itself
+let pgroups = [];
+function groupPatches() {
+  const by = {};
+  for (const p of patches) (by[shortV(p.version)] = by[shortV(p.version)] || []).push(p);
+  pgroups = Object.keys(by).sort((a, b) => b.localeCompare(a, undefined, { numeric: true })).map(name => {
+    const builds = by[name].sort((a, b) => b.version.localeCompare(a.version, undefined, { numeric: true }));
+    const active = builds.find(b => b.status === 'Active'), kept = builds.find(b => b.status === 'Kept');
+    return { name, builds, newest: builds[0].version, active: active && active.version,
+             status: active ? 'Active' : kept ? 'Kept' : '' };
+  });
+}
+const replayCount = name => replays.filter(r => r.status === 'Ready' && shortV(r.version) === name).length;
 function renderP() {
-  $('p-count').textContent = patches.length ? patches.length : '';
-  $('p-list').innerHTML = patches.length ? patches.map((p, i) => {
-    const n = replayCount(p.version);
+  groupPatches();
+  $('p-count').textContent = pgroups.length ? pgroups.length : '';
+  $('p-list').innerHTML = pgroups.length ? pgroups.map((g, i) => {
+    const n = replayCount(g.name);
     return '<div class="prow' + (selPI.has(i) ? ' sel' : '') + '" data-i="' + i + '"><span class="chk"></span>' +
-      '<span class="v">' + esc(shortV(p.version)) + '</span><span class="b">' + esc(p.version) + '</span>' +
+      '<span class="v">' + esc(g.name) + '</span><span></span>' +
       '<span>' + (n ? plural(n, 'replay') : '<span class="b">none</span>') + '</span>' +
-      '<span class="cost" data-v="' + esc(p.version) + '">' + costText(p.version) + '</span>' +
-      '<span class="st">' + (p.status === 'Active' ? 'Prepared' : p.status === 'Kept' ? 'Kept ready' : '') + '</span></div>';
+      '<span class="cost" data-v="' + esc(g.name) + '">' + costText(g.name) + '</span>' +
+      '<span class="st">' + (g.status === 'Active' ? 'Prepared' : g.status === 'Kept' ? 'Kept ready' : '') + '</span></div>';
   }).join('') : '<div class="empty">No patches stored yet.</div>';
   loadCosts();
 
   const need = {};
-  for (const r of replays) if (r.version && r.status !== 'Ready') need[r.version] = (need[r.version] || 0) + 1;
+  for (const r of replays) if (r.version && r.status !== 'Ready') need[shortV(r.version)] = (need[shortV(r.version)] || 0) + 1;
   const miss = Object.keys(need).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
   $('miss-grp').style.display = miss.length ? '' : 'none';
-  $('miss-list').innerHTML = miss.map(v => '<div class="prow"><span></span><span class="v">' + esc(shortV(v)) + '</span><span class="b">' + esc(v) + '</span><span>' + plural(need[v], 'replay') + '</span><span></span><span></span></div>').join('');
+  $('miss-list').innerHTML = miss.map(v => '<div class="prow"><span></span><span class="v">' + esc(v) + '</span><span></span><span>' + plural(need[v], 'replay') + '</span><span></span><span></span></div>').join('');
 }
 let costs = {};
 const gbs = n => n >= 1073741824 ? (n / 1073741824).toFixed(1) + ' GB' : (n / 1048576).toFixed(0) + ' MB';
@@ -1487,11 +1499,11 @@ $('p-list').addEventListener('click', e => {
 function updPB() {
   const n = selPI.size;
   $('drop-btn').disabled = !n; $('exp-btn').disabled = !n; $('rst-btn').disabled = n !== 1;
-  const p = n === 1 ? patches[[...selPI][0]] : null;
-  $('rst-btn').textContent = p && p.status === 'Active' ? 'Clear prepared files' : 'Prepare';
+  const g = n === 1 ? pgroups[[...selPI][0]] : null;
+  $('rst-btn').textContent = g && g.status === 'Active' ? 'Clear prepared files' : 'Prepare';
   $('rst-btn').title = 'Build this patch ahead of time so its replays start instantly';
 }
-const selVersions = () => [...selPI].map(i => patches[i] && patches[i].version).filter(Boolean);
+const selGroups = () => [...selPI].map(i => pgroups[i]).filter(Boolean);
 async function addPatch() {
   const p = await call('pick_file', { title: 'Select League of Legends.exe', wildcard: 'League of Legends.exe|League of Legends.exe' });
   if (!p) return;
@@ -1500,25 +1512,26 @@ async function addPatch() {
   loadP(); loadR();
 }
 async function dropPatches() {
-  const v = selVersions(); if (!v.length) return;
-  const n = v.reduce((s, x) => s + replayCount(x), 0);
-  const frees = v.length === 1 && costs[v[0]] ? ' Frees about ' + gbs(costs[v[0]].unique) + '.' : '';
-  if (!await cfmDlg('Delete ' + v.join(', ') + '?' + frees + (n ? ' ' + plural(n, 'replay') + ' will no longer be watchable.' : '') + ' This can\'t be undone.')) return;
-  openCon('Deleting patch ' + v.join(', '), true, false);
-  await call('drop_patches', { patches: v });
+  const gs = selGroups(); if (!gs.length) return;
+  const names = gs.map(g => g.name).join(', ');
+  const n = gs.reduce((s, g) => s + replayCount(g.name), 0);
+  const frees = gs.length === 1 && costs[gs[0].name] ? ' Frees about ' + gbs(costs[gs[0].name].unique) + '.' : '';
+  if (!await cfmDlg('Delete patch ' + names + '?' + frees + (n ? ' ' + plural(n, 'replay') + ' will no longer be watchable.' : '') + ' This can\'t be undone.')) return;
+  openCon('Deleting patch ' + names, true, false);
+  await call('drop_patches', { patches: gs.flatMap(g => g.builds.map(b => b.version)) });
   loadP(); loadR();
 }
 async function expPatches() {
-  const v = selVersions(); if (!v.length) return;
-  openCon('Exporting patch ' + v.join(', '));
-  await call('export_patches', { patches: v });
+  const gs = selGroups(); if (!gs.length) return;
+  openCon('Exporting patch ' + gs.map(g => g.name).join(', '));
+  await call('export_patches', { patches: gs.map(g => g.newest) });
   loadP();
 }
 function restorePatch() { const a = [...selPI]; if (a.length === 1) doRestore(a[0]); }
 async function doRestore(i) {
-  const p = patches[i]; if (!p) return;
-  openCon(p.status === 'Active' ? 'Clearing prepared patch ' + p.version : 'Preparing patch ' + p.version);
-  await call('restore_patch', { patch: p.version });
+  const g = pgroups[i]; if (!g) return;
+  openCon(g.status === 'Active' ? 'Clearing prepared patch ' + g.name : 'Preparing patch ' + g.name);
+  await call('restore_patch', { patch: g.active || g.newest });
   loadP();
 }
 
@@ -1574,7 +1587,7 @@ async function loadSettings() {
   $('repo-path').classList.toggle('unset', !config.repository);
   $('repo-note').innerHTML = repoOk ? '' : '<b>Not found.</b> Choose where your storage is now.';
   renderList('fl-list', (config.replay_folders || []).map(f => ({ label: f })), 'None', i => { selFI = i; $('rm-fl-btn').disabled = false; });
-  renderList('gp-list', (config.game_paths || []).map(p => ({ label: p.path, v: p.version, err: p.error })), 'None found', i => { selGI = i; $('rm-gp-btn').disabled = false; },
+  renderList('gp-list', (config.game_paths || []).map(p => ({ label: p.path, v: p.version ? shortV(p.version) : '', err: p.error })), 'None found', i => { selGI = i; $('rm-gp-btn').disabled = false; },
     i => showFile(config.game_paths[i].path));
   selFI = selGI = -1; $('rm-fl-btn').disabled = $('rm-gp-btn').disabled = true;
   $('dd-auto').checked = config.auto_download_assets !== false;

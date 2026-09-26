@@ -147,6 +147,12 @@ def load_from_repo(src, dst):
         shutil.copyfile(src, dst)
 
 
+def show(tag):
+    """what people see for a patch. 16.19.821.7343 is just 16.19, the build numbers are for us.
+    anything that isn't a league version comes through as is"""
+    return '.'.join(tag.split('.')[:2]) if re.fullmatch(r'\d+\.\d+\.\d+\.\d+', tag or '') else tag
+
+
 def _is_wad_path(rel_path):
     return rel_path.lower().endswith('.wad.client')
 
@@ -663,7 +669,7 @@ class LargeVCS:
                     with _pool(workers) as executor:
                         futures = {executor.submit(self._store_wad, fp, known, None, writer): rp
                                    for fp, rp in wad_files}
-                        for future in track(as_completed(futures), total=len(futures), label=f'Storing patch {tag}'):
+                        for future in track(as_completed(futures), total=len(futures), label=f'Storing patch {show(tag)}'):
                             self._record(patch, dups, future.result(), futures[future])
                 finally:
                     writer.seal()
@@ -692,7 +698,7 @@ class LargeVCS:
             if not missing:
                 return 0
 
-            print(f'Patch {tag}: storing {len(missing)} files added since it was first stored...')
+            print(f'Patch {show(tag)}: storing {len(missing)} files added since it was first stored...')
             known = self._known_blobs()
             writer = PackWriter(self.packs)
             added = []
@@ -826,7 +832,7 @@ class LargeVCS:
     def _restore(self, tag, clean, skip):
         added = self.fill_placeholders([tag]).get(tag)
         if added:
-            print(f'Patch {tag} was missing {added} of Riot\'s empty placeholder archives, put them back.')
+            print(f'Patch {show(tag)} was missing {added} of Riot\'s empty placeholder archives, put them back.')
         patch = self.get_patch(tag)
         assert patch is not None, f'Patch {tag} does not exist!'
         wanted = self.pairs(tag, patch)
@@ -849,7 +855,7 @@ class LargeVCS:
                 self._unpark(tag)
                 self._drop_kept(self.kept()[max(self.keep_prepared - 1, 0):])
                 current = tag
-                print(f'Patch {tag} was kept ready.')
+                print(f'Patch {show(tag)} was kept ready.')
             else:
                 if current and self._park(current, wad_bytes):
                     current = None
@@ -865,7 +871,7 @@ class LargeVCS:
             todo = {(h, r) for h, r in wanted
                     if (r in stubs and r not in skip) or not os.path.exists(self.current_path(r))}
             if not todo:
-                print(f'Already on {tag}.')
+                print(f'Patch {show(tag)} is already ready.')
                 return
         else:
             current_patch = self.get_patch(current) if current else None
@@ -917,10 +923,10 @@ class LargeVCS:
             sizes = {h: self._wad_size(h) for h, _ in wads}
             wads.sort(key=lambda x: sizes[x[0]], reverse=True)
             total = sum(sizes.values())
-            print(f'Building patch {tag}: {len(wads)} archives, {total / 1024 ** 3:.1f} GB ({WORKERS} threads)...')
+            print(f'Building patch {show(tag)}: {len(wads)} archives, {total / 1024 ** 3:.1f} GB ({WORKERS} threads)...')
             # counted as bytes get written, not when a whole archive finishes. biggest go first and 16 run at
             # once, so counting finished ones sat near 0% for ages and made the time left useless
-            label = f'Building patch {tag}'
+            label = f'Building patch {show(tag)}'
             count_lock, counted, per_wad = threading.Lock(), [0], {}
             cancel = cancel_event()
 
@@ -952,7 +958,7 @@ class LargeVCS:
         _write_json_atomic(self.current_patch_path, tag)
         # keep_prepared counts the current one
         self._drop_kept(self.kept()[max(self.keep_prepared - 1, 0):])
-        print(f'Patch {tag} is ready.')
+        print(f'Patch {show(tag)} is ready.')
 
     def _link_from_kept(self, tag, wads, stubs):
         """identical archives in a kept patch get hard linked instead of rebuilt. returns what's left"""
@@ -1010,7 +1016,7 @@ class LargeVCS:
 
         with _pool(WORKERS) as executor:
             futures = [executor.submit(_one, item) for item in items]
-            for future in track(as_completed(futures), total=len(futures), label=f'Exporting patch {tag}'):
+            for future in track(as_completed(futures), total=len(futures), label=f'Exporting patch {show(tag)}'):
                 future.result()
 
     # storage format stuff
@@ -1214,7 +1220,7 @@ class LargeVCS:
 
     def patch_costs(self):
         """size per patch + how much deleting it actually frees"""
-        return self._cached('costs', self._patch_costs)
+        return self._cached('patch-sizes', self._patch_costs)
 
     def _patch_costs(self):
         tags = self.list()
@@ -1260,9 +1266,22 @@ class LargeVCS:
         for tag, refs in per_patch.items():
             for d in refs:
                 owners[d] = owners.get(d, 0) + 1
-        return {tag: {'total': sum(sizes[d] for d in refs),
-                      'unique': sum(sizes[d] for d in refs if owners[d] == 1)}
-                for tag, refs in per_patch.items()}
+        result = {tag: {'total': sum(sizes[d] for d in refs),
+                        'unique': sum(sizes[d] for d in refs if owners[d] == 1)}
+                  for tag, refs in per_patch.items()}
+        # and per patch the way people see them (16.19 = every stored 16.19 build). what deleting the lot
+        # frees is whatever no other patch uses, which the per build numbers can't tell you
+        groups = {}
+        for tag, refs in per_patch.items():
+            groups.setdefault(show(tag), set()).update(refs)
+        users = {}
+        for refs in groups.values():
+            for d in refs:
+                users[d] = users.get(d, 0) + 1
+        for name, refs in groups.items():
+            result.setdefault(name, {'total': sum(sizes[d] for d in refs),
+                                     'unique': sum(sizes[d] for d in refs if users[d] == 1)})
+        return result
 
     def _whole_wads(self):
         whole = {}

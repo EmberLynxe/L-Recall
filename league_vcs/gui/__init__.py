@@ -39,6 +39,7 @@ from .tray_item import TrayItem
 from .. import __version__, core, updates, winproc
 from ..config import Config
 from ..exceptions import UserInputException
+from large_vcs import show
 from large_vcs.progress import Cancelled, reporting
 
 
@@ -183,11 +184,11 @@ class GUI:
         if repo is None:
             return None
         try:
-            stored, ready = len(repo.list()), repo.current()
+            stored, ready = len({show(t) for t in repo.list()}), repo.current()
         except Exception:
             return None
         text = f"{stored} patch{'es' if stored != 1 else ''} stored"
-        return text + (f' · {ready} ready' if ready else '')
+        return text + (f' · {show(ready)} ready' if ready else '')
 
     def auto_scan_loop(self):
         threading.Thread(target=self._scan_game_directories, daemon=True, args=(False,)).start()
@@ -360,15 +361,15 @@ class GUI:
                     try:
                         core.top_up(os.path.dirname(game_path))
                     except Cancelled:
-                        print(f'Top-up of {version} stopped, a game started. Next check carries on.')
+                        print(f'Top-up of {show(version)} stopped, a game started. Next check carries on.')
                         break
                     except Exception as e:
-                        print(f'Top-up of {version} failed: {e}')
+                        print(f'Top-up of {show(version)} failed: {e}')
 
             if new_versions:
                 wx.CallAfter(self.tray_icon.ShowBalloon,
                              title=f"Found new patch{'es' if len(new_versions) > 1 else ''}!",
-                             text=f"Storing {', '.join(new_versions)} in the background.")
+                             text=f"Storing {', '.join(sorted({show(v) for v in new_versions}))} in the background.")
             elif user_initiated:
                 wx.CallAfter(self.tray_icon.ShowBalloon,
                              title='No new patches found.',
@@ -386,20 +387,20 @@ class GUI:
                         core.add(os.path.dirname(game_path), workers=max(2, (os.cpu_count() or 4) // 2))
                 except Cancelled:
                     stopped = True
-                    print(f'Stopped storing {version}, a game started. Next check carries on.')
+                    print(f'Stopped storing {show(version)}, a game started. Next check carries on.')
                     break
                 except UserInputException as e:
-                    print(f'Skipped {version}: {e}')  # still updating, or changed mid-copy. next scan retries
+                    print(f'Skipped {show(version)}: {e}')  # still updating, or changed mid-copy. next scan retries
                     continue
                 except Exception as e:
-                    print(f'Skipped {version}: {e}')
-                    self.notify(f"Couldn't store patch {version}", 'Check the log in the logs folder for details.')
+                    print(f'Skipped {show(version)}: {e}')
+                    self.notify(f"Couldn't store patch {show(version)}", 'Check the log in the logs folder for details.')
                     continue
                 finally:
                     if first and not self.settings_frame:
                         self.set_low_priority()
                 wx.CallAfter(self.tray_icon.ShowBalloon,
-                             title=f'Stored patch {version}',
+                             title=f'Stored patch {show(version)}',
                              text='Replays from this patch can now be watched.')
 
             if not stopped:

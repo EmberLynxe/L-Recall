@@ -18,6 +18,7 @@ from ..utils.frame import CallbackFrame
 from ..utils.output import capture
 from large_vcs.progress import Cancelled, reporting
 
+from large_vcs import show
 from ... import __version__, assets, core, selfupdate, uninstall, updates, vanguard, winproc
 from ...config import Config
 from ...notes import Notes
@@ -252,7 +253,7 @@ class SettingsFrame(CallbackFrame):
             'replays': result,
             'all_tags': self.notes.all_tags(),
             'folders': list(folders),
-            'stored': sorted(stored, reverse=True),
+            'stored': sorted({show(t) for t in stored}, reverse=True),
             'repo_ok': repo is not None,
         })
 
@@ -734,13 +735,13 @@ class SettingsFrame(CallbackFrame):
         stored = set(core.repo.list())
         for patch in patches:
             if patch not in stored:
-                raise ValueError(f"Patch {patch} isn't stored.")
+                raise ValueError(f"Patch {show(patch)} isn't stored.")
         return patches
 
     def _do_drop_patches(self, patches):
         core.set_repo_path(self.config['repository'])
         for patch in self._known_patches(patches):
-            print(f'Dropping {patch}...')
+            print(f'Deleting {show(patch)}...')
             core.repo.drop(patch, collect=False)
         # one cleanup pass for the lot, it has to read every remaining patch
         print('Removing files nothing uses any more...')
@@ -761,8 +762,8 @@ class SettingsFrame(CallbackFrame):
     def _do_export_patches(self, patches, destination):
         core.set_repo_path(self.config['repository'])
         for patch in self._known_patches(patches):
-            dest_path = os.path.join(destination, patch.replace('.', '-'))
-            print(f'Exporting {patch} to {dest_path}...')
+            dest_path = os.path.join(destination, 'League ' + show(patch))
+            print(f'Exporting {show(patch)} to {dest_path}...')
             if os.path.exists(dest_path):
                 raise ValueError(f'Destination {dest_path} already exists!')
             os.makedirs(dest_path)
@@ -775,10 +776,10 @@ class SettingsFrame(CallbackFrame):
             raise UserInputException('League is running. Close the game (and any replay) first.')
         self._known_patches([patch])
         if core.repo.current() == patch:
-            print(f'Deselecting patch {patch}...')
+            print(f'Clearing prepared patch {show(patch)}...')
             core.repo.clean()
         else:
-            print(f'Restoring patch {patch}...')
+            print(f'Preparing patch {show(patch)}...')
             core.repo.restore(patch)
         print('Done!')
 

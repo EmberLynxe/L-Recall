@@ -8,7 +8,7 @@ import subprocess
 import time
 from typing import Optional
 
-from large_vcs import LargeVCS, _version_key, progress
+from large_vcs import LargeVCS, _version_key, progress, show
 
 from league_vcs import signing, winproc
 from league_vcs.exceptions import UserInputException
@@ -171,13 +171,13 @@ def add(directory, workers=None):
     game_path = os.path.join(directory, GameParser.executable_name)
     version, is_new = can_update(game_path)
     if not is_new:
-        raise ValueError(f'Already have patch {version}.')
+        raise ValueError(f'Already have patch {show(version)}.')
     before = _install_stamp(directory)
     if time.time() - before[0] <= SETTLE_SECONDS:
-        raise UserInputException(f'Patch {version} was updated in the last few minutes. '
+        raise UserInputException(f'Patch {show(version)} was updated in the last few minutes. '
                                  'Waiting for the update to finish before storing it.')
 
-    print(f'Adding patch {version} to repository.')
+    print(f'Storing patch {show(version)}.')
     print(f'This may take a while.')
     repo.add(directory, version, workers=workers)
 
@@ -185,7 +185,7 @@ def add(directory, workers=None):
     # throw the copy away, a patch made of two versions won't play
     if _install_stamp(directory) != before or GameParser(game_path).version != version:
         repo.drop(version)
-        raise InstallChanged(f'The game updated while patch {version} was being stored, so that copy was '
+        raise InstallChanged(f'The game updated while patch {show(version)} was being stored, so that copy was '
                              'discarded. It will be stored again once the update finishes.')
 
 
@@ -205,7 +205,7 @@ def top_up(directory):
             if repo.current() == version:
                 repo.clean()
             repo.gc()
-        raise InstallChanged(f'The game updated during the top-up of {version}; the change was rolled back.')
+        raise InstallChanged(f'The game updated while patch {show(version)} was being topped up; the change was rolled back.')
     return added
 
 
@@ -228,7 +228,7 @@ def vanguard_preflight(version, warn_old=True):
     new = needs_vanguard(version)
     if not st['installed']:
         if new:
-            return 'block', (f'Patch {version} needs Riot Vanguard, which isn\'t installed. '
+            return 'block', (f'Patch {show(version)} needs Riot Vanguard, which isn\'t installed. '
                              'Install it from the Riot Client, restart, then try again.')
         return None, None
     if st['running'] and st['mode'] == 'boot':
@@ -238,12 +238,12 @@ def vanguard_preflight(version, warn_old=True):
             # pre-check switches it on and off by itself. not running yet is how it's meant to be
             return None, None
         if st['mode'] == 'disabled':
-            return 'block', (f'Patch {version} needs Riot Vanguard, but it\'s disabled. '
+            return 'block', (f'Patch {show(version)} needs Riot Vanguard, but it\'s disabled. '
                              'Repair or reinstall it from the Riot Client, restart, then try again.')
-        return 'block', (f'Patch {version} needs Riot Vanguard, which isn\'t running. '
+        return 'block', (f'Patch {show(version)} needs Riot Vanguard, which isn\'t running. '
                          'If you exited it from the tray, it comes back when you restart your PC.')
     if not new and st['running'] and warn_old:
-        return 'warn', (f'Patch {version} is from before Vanguard. It should still play with Vanguard on, '
+        return 'warn', (f'Patch {show(version)} is from before Vanguard. It should still play with Vanguard on, '
                         'but this combination is untested and may be unstable. If the replay crashes, '
                         'exit Vanguard from its tray icon (it comes back when you restart) and try again.')
     return None, None
@@ -283,17 +283,14 @@ def watch(replay, before_launch=None):
     rofl = ROFLParser(replay)
     game_version = client_for(rofl.version)
     if game_version is None:
-        raise UserInputException(f'No game client found for patch {rofl.version}.')
-    if game_version != rofl.version:
-        print(f'Build {rofl.version} isn\'t stored, so this plays on {game_version} from the same patch, '
-              'like the League client does.')
+        raise UserInputException(f'Patch {show(rofl.version)} isn\'t stored, so this replay can\'t be played.')
     if winproc.game_running():
         raise UserInputException('A game is already running. Close it before watching a replay.')
     level, message = vanguard_preflight(game_version)
     if message:
         print('Note: ' + message)
 
-    print(f'Preparing patch {game_version}...')
+    print(f'Preparing patch {show(game_version)}...')
     repo.restore(game_version, skip=quick_start_skip(game_version, rofl.info.players) if quick_start else ())
     placeholders = bool(repo.stubs())
     ran, repair = _launch(game_version, replay, before_launch)
@@ -319,7 +316,7 @@ def _launch(game_version, replay, before_launch):
     game_path = repo.current_path(GameParser.executable_name)
     problem = signing.check_game_folder(repo.current_path(), GameParser.executable_name)
     if problem:
-        raise UserInputException(f'Not launching patch {game_version}: {problem} '
+        raise UserInputException(f'Not launching patch {show(game_version)}: {problem} '
                                  'The stored copy might be damaged, or it didn\'t come from Riot.')
     if use_my_settings:
         try:
@@ -335,7 +332,7 @@ def _launch(game_version, replay, before_launch):
             os.unlink(note)  # an old one from last time would look like this launch failed
         except OSError:
             pass
-    print(f'Launching replay on patch {game_version}...')
+    print(f'Launching replay on patch {show(game_version)}...')
     # launch it the same way the riot client does. never touch the game process
     started = time.monotonic()
     try:
@@ -368,7 +365,7 @@ def _other_options(version):
         return ' This one\'s on the patch you have installed, so you can watch it from the League client instead.'
     if not needs_vanguard(version):
         # nobody's checked this one properly yet, so don't promise anything
-        return (f' Patch {version} is from before Vanguard, so exiting Vanguard from its tray icon might let it play. '
+        return (f' Patch {show(version)} is from before Vanguard, so exiting Vanguard from its tray icon might let it play. '
                 'That\'s untested. You\'d need to restart your PC before playing League again.')
     return ''
 

@@ -90,6 +90,17 @@ class StorageTest(RepoTest):
         self.assertEqual(set(self.repo.patch_costs()), {'P1', 'P2'})
         self.assertEqual([r['tag'] for r in self.repo.storage_report()], ['P1', 'P2'])
 
+    def test_people_only_see_the_patch_not_the_build(self):
+        self.assertEqual(large_vcs.show('16.19.821.7343'), '16.19')
+        self.assertEqual(large_vcs.show('P1'), 'P1')
+        shared = {'a.dll': b'same', r'DATA\x.wad.client': ('wad', random_assets(5, seed=14), 14)}
+        self.repo.add(self.install('b1', {**shared, 'game.exe': b'build 1'}), '16.19.820.1')
+        self.repo.add(self.install('b2', {**shared, 'game.exe': b'build 2'}), '16.19.821.1')
+        costs = self.repo.patch_costs()
+        # each build alone frees next to nothing, the patch as a whole frees everything
+        self.assertLess(costs['16.19.820.1']['unique'], costs['16.19']['unique'])
+        self.assertEqual(costs['16.19']['unique'], costs['16.19']['total'])
+
     def test_building_reports_bytes_as_it_goes(self):
         inst = self.install('p1', {r'DATA\big.wad.client': ('wad', random_assets(60, seed=7, size=(40, 400000)), 7)})
         self.repo.add(inst, 'P1')
