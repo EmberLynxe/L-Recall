@@ -1017,6 +1017,9 @@ class LargeVCS:
 
     def storage_report(self):
         """what format each patch is in"""
+        return self._cached('formats', self._storage_report)
+
+    def _storage_report(self):
         report = []
         for tag in self.list():
             patch = self.get_patch(tag) or {}
@@ -1180,13 +1183,41 @@ class LargeVCS:
             log(f'  {len(written):,} files moved into {len(packs._current_stamp())} bundles.')
             return len(written)
 
+    def _patches_stamp(self):
+        """changes whenever any patch is added, dropped or rewritten"""
+        return [[t, os.path.getmtime(self._patch_path(t))] for t in self.list()]
+
+    def _cached(self, name, compute):
+        """answers that only change when a patch does. kept in memory and in a small file in lvcs,
+        so the first look after starting the app doesn't have to open every archive again"""
+        stamp = self._patches_stamp()
+        key = (self.root, name)
+        hit = _cost_cache.get(key)
+        if hit and hit[0] == stamp:
+            return hit[1]
+        path = self.repo_path(name + '.cache.json')
+        try:
+            with open(path) as f:
+                saved = json.load(f)
+            if saved.get('stamp') == stamp:
+                _cost_cache[key] = (stamp, saved['value'])
+                return saved['value']
+        except (OSError, ValueError, AttributeError, KeyError):
+            pass
+        value = compute()
+        _cost_cache[key] = (stamp, value)
+        try:
+            _write_json_atomic(path, {'stamp': stamp, 'value': value})
+        except OSError:
+            pass  # read only folder or whatever, it's only a cache
+        return value
+
     def patch_costs(self):
         """size per patch + how much deleting it actually frees"""
+        return self._cached('costs', self._patch_costs)
+
+    def _patch_costs(self):
         tags = self.list()
-        stamp = tuple((t, os.path.getmtime(self.repo_path('patches', t + '.json'))) for t in tags)
-        cached = _cost_cache.get(self.root)
-        if cached and cached[0] == stamp:
-            return cached[1]
 
         sizes = {}
 
@@ -1229,11 +1260,9 @@ class LargeVCS:
         for tag, refs in per_patch.items():
             for d in refs:
                 owners[d] = owners.get(d, 0) + 1
-        result = {tag: {'total': sum(sizes[d] for d in refs),
-                        'unique': sum(sizes[d] for d in refs if owners[d] == 1)}
-                  for tag, refs in per_patch.items()}
-        _cost_cache[self.root] = (stamp, result)
-        return result
+        return {tag: {'total': sum(sizes[d] for d in refs),
+                      'unique': sum(sizes[d] for d in refs if owners[d] == 1)}
+                for tag, refs in per_patch.items()}
 
     def _whole_wads(self):
         whole = {}

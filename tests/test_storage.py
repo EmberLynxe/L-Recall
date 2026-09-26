@@ -78,6 +78,18 @@ class StorageTest(RepoTest):
         report = self.repo.storage_report()[0]
         self.assertEqual((report['exact'], report['whole']), (2, 0))
 
+    def test_page_answers_are_cached_until_a_patch_changes(self):
+        p1 = self.install('p1', {'a.dll': b'1', r'DATA\x.wad.client': ('wad', random_assets(5, seed=13), 13)})
+        self.repo.add(p1, 'P1')
+        first = self.repo.patch_costs()
+        large_vcs._cost_cache.clear()  # like starting the app again
+        with mock.patch.object(self.repo, '_patch_costs', side_effect=AssertionError('recomputed')):
+            self.assertEqual(self.repo.patch_costs(), first)
+        p2 = self.install('p2', {'a.dll': b'2'})
+        self.repo.add(p2, 'P2')
+        self.assertEqual(set(self.repo.patch_costs()), {'P1', 'P2'})
+        self.assertEqual([r['tag'] for r in self.repo.storage_report()], ['P1', 'P2'])
+
     def test_building_reports_bytes_as_it_goes(self):
         inst = self.install('p1', {r'DATA\big.wad.client': ('wad', random_assets(60, seed=7, size=(40, 400000)), 7)})
         self.repo.add(inst, 'P1')
