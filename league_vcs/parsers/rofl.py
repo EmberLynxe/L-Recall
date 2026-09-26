@@ -71,6 +71,8 @@ _EXTRA_STATS = [
     ('dmg_buildings', 'TOTAL_DAMAGE_DEALT_TO_BUILDINGS'),
     ('dmg_objectives', 'TOTAL_DAMAGE_DEALT_TO_OBJECTIVES'),
     ('turrets', 'TURRET_TAKEDOWNS'),
+    # last hits only, so they add up to the towers a team actually took. takedowns double count
+    ('turrets_killed', 'TURRETS_KILLED'),
     ('dragons', 'DRAGON_KILLS'),
     ('barons', 'BARON_KILLS'),
     ('heralds', 'RIFT_HERALD_KILLS'),

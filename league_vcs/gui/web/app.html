@@ -1200,7 +1200,7 @@ function breakdownHTML() {
   return '<div class="legend"><span style="--c:var(--win)">' + A.label + '</span><span style="--c:var(--loss)">' + B.label + '</span></div>' +
     '<div class="cmp">' +
       cmp('Kills', p => p.kills) + cmp('Gold', p => p.gold, fmtK) + cmp('Damage to champions', p => p.damage_dealt, fmtK) +
-      cmp('Turrets', p => S(p, 'turrets')) + cmp('Dragons', p => S(p, 'dragons')) + cmp('Barons', p => S(p, 'barons')) +
+      cmp('Turrets', p => S(p, 'turrets_killed')) + cmp('Dragons', p => S(p, 'dragons')) + cmp('Barons', p => S(p, 'barons')) +
       cmp('Void grubs', p => S(p, 'grubs')) + cmp('Vision score', p => p.vision_score) +
     '</div><div class="charts">' +
       chart('Damage to champions', types, p => p.damage_dealt, fmtK, dmgParts) +
