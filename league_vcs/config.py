@@ -22,6 +22,8 @@ class Config(dict):
         'vanguard_warn_old': True,
         'check_updates': True,
         'dismissed_update': '',
+        'keep_prepared': 2,
+        'quick_start': False,
     }
 
     def __init__(self, path):

@@ -34,6 +34,8 @@ class GUI:
 
     def __init__(self, config: Config):
         self.config = config
+        core.keep_prepared = config.get('keep_prepared', 2)
+        core.quick_start = config.get('quick_start', False)
         self.app = wx.App()
         try:
             self.app.MSWEnableDarkMode(wx.App.DarkMode_Always)

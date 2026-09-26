@@ -514,6 +514,16 @@ tr.me .pl-n { color: var(--gold); }
           </div>
         </div>
         <div class="frow">
+          <div><h3>Starting replays</h3><p>A replay on a patch that isn't ready yet gets built first. How long that takes mostly comes down to your drive.</p></div>
+          <div>
+            <div class="inl"><select class="input" id="keep-sel" style="width:auto" onchange="setReplayStart({ keep: +this.value })">
+              <option value="1">Keep 1 patch ready</option><option value="2">Keep 2 patches ready</option>
+              <option value="3">Keep 3 patches ready</option><option value="4">Keep 4 patches ready</option></select></div>
+            <div class="hint">Going back to a patch that's kept ready is instant. Each one takes about 25 to 30 GB.</div>
+            <label class="check"><input type="checkbox" id="quick-chk" onchange="setReplayStart({ quick: this.checked })"> Quick start: only build the champions in the replay (testing)</label>
+          </div>
+        </div>
+        <div class="frow">
           <div><h3>Champion &amp; item icons</h3><p>Kept on disk from Data Dragon so replays load instantly and work offline.</p></div>
           <div>
             <div class="cache-info" id="dd-info">...</div>
@@ -614,12 +624,20 @@ window.__ack = () => { _q.shift(); _s = false; _flush(); };
 window.__respond = r => { const c = _cb[r.id]; if (c) { delete _cb[r.id]; c(r); } };
 window.__console_line = t => { const e = $('con-out'); e.textContent += t; e.scrollTop = e.scrollHeight; };
 // big totals are bytes (optimize), a percentage reads better than 31,122,382,499 / 83,000,000,000
+// time left comes from how fast it's actually going on this pc, not a guess per drive type
+let _pg = null;
+const etaText = s => s < 60 ? 'about ' + Math.max(5, Math.round(s / 5) * 5) + 's left' : 'about ' + Math.round(s / 60) + ' min left';
 window.__console_progress = (done, total, label) => {
+  const now = performance.now();
+  if (!_pg || _pg.label !== label || done < _pg.done) _pg = { label, start: now, first: done };
+  _pg.done = done;
   const pct = total ? Math.min(100, done / total * 100) : 0;
+  const secs = (now - _pg.start) / 1000, did = done - _pg.first;
+  const eta = secs > 3 && did > 0 && done < total ? ' · ' + etaText(secs * (total - done) / did) : '';
   $('con-prog').classList.add('on');
   $('con-pfill').style.width = pct.toFixed(1) + '%';
   $('con-plabel').textContent = label || 'Working';
-  $('con-pnum').textContent = total > 1e6 ? Math.floor(pct) + '%' : done.toLocaleString() + ' / ' + total.toLocaleString();
+  $('con-pnum').textContent = (total > 1e6 ? Math.floor(pct) + '%' : done.toLocaleString() + ' / ' + total.toLocaleString()) + eta;
 };
 window.__console_done = () => { $('con-close').style.display = ''; $('con-sp').style.display = 'none'; };
 function send(action, args) {
@@ -1359,7 +1377,7 @@ function renderP() {
       '<span class="v">' + esc(shortV(p.version)) + '</span><span class="b">' + esc(p.version) + '</span>' +
       '<span>' + (n ? plural(n, 'replay') : '<span class="b">none</span>') + '</span>' +
       '<span class="cost" data-v="' + esc(p.version) + '">' + costText(p.version) + '</span>' +
-      '<span class="st">' + (p.status === 'Active' ? 'Prepared' : '') + '</span></div>';
+      '<span class="st">' + (p.status === 'Active' ? 'Prepared' : p.status === 'Kept' ? 'Kept ready' : '') + '</span></div>';
   }).join('') : '<div class="empty">No patches stored yet.</div>';
   loadCosts();
 
@@ -1481,6 +1499,8 @@ async function loadSettings() {
     i => showFile(config.game_paths[i].path));
   selFI = selGI = -1; $('rm-fl-btn').disabled = $('rm-gp-btn').disabled = true;
   $('dd-auto').checked = config.auto_download_assets !== false;
+  $('keep-sel').value = String(config.keep_prepared || 2);
+  $('quick-chk').checked = !!config.quick_start;
   loadCacheInfo();
   loadVanguard();
   loadUpdateInfo();
@@ -1553,6 +1573,7 @@ async function updLater() {
 }
 async function updAuto(on) { await call('set_check_updates', { on }); }
 
+async function setReplayStart(opts) { await call('set_replay_start', opts); Object.assign(config, opts.keep ? { keep_prepared: opts.keep } : { quick_start: opts.quick }); }
 async function vgWarn(on) { await call('set_vanguard_warn', { on }); }
 async function loadCacheInfo() {
   try {
@@ -1652,6 +1673,7 @@ function openCon(title) {
   $('con-out').textContent = '';
   $('con-prog').classList.remove('on');
   $('con-pfill').style.width = '0';
+  _pg = null;
   $('con-close').style.display = 'none';
   $('con-sp').style.display = '';
   $('con-ov').classList.add('on');

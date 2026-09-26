@@ -194,6 +194,8 @@ class SettingsFrame(CallbackFrame):
             'repository': self.config.get('repository', ''),
             'player_names': self.config.get('player_names', []),
             'auto_download_assets': self.config.get('auto_download_assets', True),
+            'keep_prepared': self.config.get('keep_prepared', 2),
+            'quick_start': self.config.get('quick_start', False),
         })
 
     def _handle_get_replays(self, req_id, _msg):
@@ -303,9 +305,10 @@ class SettingsFrame(CallbackFrame):
         result = []
         repo = self._repo_or_none()
         if repo:
-            current = repo.current()
+            current, kept = repo.current(), set(repo.kept())
             for patch in sorted(repo.list(), key=_version_key, reverse=True):
-                result.append({'version': patch, 'status': 'Active' if patch == current else 'Stored'})
+                status = 'Active' if patch == current else 'Kept' if patch in kept else 'Stored'
+                result.append({'version': patch, 'status': status})
         self._respond(req_id, result)
 
     def _handle_pick_file(self, req_id, msg):
@@ -515,6 +518,16 @@ class SettingsFrame(CallbackFrame):
             print(f'Latest patch is {vs[0]}. Checking for missing icons...')
             print(f'{assets.prefetch_latest()} new files. Done.')
         self._run_console_op(req_id, _refresh)
+
+    def _handle_set_replay_start(self, req_id, msg):
+        if 'keep' in msg:
+            core.keep_prepared = self.config['keep_prepared'] = max(1, min(4, int(msg['keep'])))
+            if core.repo:
+                core.repo.keep_prepared = core.keep_prepared
+        if 'quick' in msg:
+            core.quick_start = self.config['quick_start'] = bool(msg['quick'])
+        self.config.save()
+        self._respond(req_id, True)
 
     def _handle_set_auto_assets(self, req_id, msg):
         self.config['auto_download_assets'] = bool(msg.get('on'))

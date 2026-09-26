@@ -14,11 +14,38 @@ from league_vcs.parsers import ROFLParser, GameParser
 from league_vcs.parsers.rofl import scan_replays
 
 repo: Optional[LargeVCS] = None
+# settings the gui keeps in sync with the config
+keep_prepared = 2
+quick_start = False
 
 
 def set_repo_path(path):
     global repo
     repo = LargeVCS.load_or_create(path)
+    repo.keep_prepared = keep_prepared
+
+
+def quick_start_skip(version, players):
+    """champion archives nobody in this replay uses. they go in as riot's empty placeholder.
+    empty set if we can't be sure, then everything gets built like normal"""
+    playing = {p['champion'].lower() for p in players if p.get('champion')}
+    if not playing:
+        return set()
+    from league_vcs import assets
+    try:
+        champions = {c.lower() for c in assets.champion_names(assets.version_for('.'.join(version.split('.')[:2])))}
+    except Exception:
+        return set()
+    if not champions or not playing <= champions:
+        return set()
+    skip = set()
+    for _, rel in repo.pairs(version):
+        parts = rel.replace('\\', '/').split('/')
+        if len(parts) > 1 and parts[-2].lower() == 'champions' and rel.lower().endswith('.wad.client'):
+            name = parts[-1].split('.')[0].lower()
+            if name in champions and name not in playing:
+                skip.add(rel)
+    return skip
 
 
 def can_update(game_path):
@@ -198,7 +225,7 @@ def watch(replay):
         print('Note: ' + message)
 
     print(f'Preparing patch {game_version}...')
-    repo.restore(game_version)
+    repo.restore(game_version, skip=quick_start_skip(game_version, rofl.info.players) if quick_start else ())
 
     game_path = repo.current_path(GameParser.executable_name)
     problem = signing.check_game_folder(repo.current_path(), GameParser.executable_name)

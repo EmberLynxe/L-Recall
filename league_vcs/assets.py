@@ -190,6 +190,11 @@ def download_for_replays(replays, log=print):
     log('Done.')
 
 
+def champion_names(version):
+    """data dragon ids, which is also what the champion archives are called (MonkeyKing, not Wukong)"""
+    return list(_catalog(version, 'champion')['data'])
+
+
 def _vkey(v):
     return [int(x) if x.isdigit() else 0 for x in v.split('.')]
 
