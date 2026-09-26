@@ -1,8 +1,10 @@
 import sys
 import threading
+import time
 import traceback
 
 import wx
+from large_vcs.progress import reporting
 
 from .. import theme
 from ..icons import icon
@@ -51,7 +53,19 @@ class TextConsoleFrame(Frame):
         text.SetBackgroundColour(theme.BG_INPUT)
         text.SetForegroundColour(theme.TEXT)
         text.SetFont(wx.Font(9, wx.FONTFAMILY_TELETYPE, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
-        text_box.Add(text, 0, wx.BOTTOM, self.FromDIP(12))
+        text_box.Add(text, 0, wx.BOTTOM, self.FromDIP(8))
+
+        # same clocks as the main window: running time, and time left once there's a rate to go on
+        self.gauge = wx.Gauge(self, range=1000, size=self.FromDIP(wx.Size(700, 8)))
+        text_box.Add(self.gauge, 0, wx.EXPAND | wx.BOTTOM, self.FromDIP(4))
+        self.status = theme.styled_text(self, 'Working · 0:00', theme.TEXT)
+        text_box.Add(self.status, 0, wx.BOTTOM, self.FromDIP(12))
+        self._started = time.monotonic()
+        self._prog = None  # (label, pct text, eta seconds, when)
+        self._run_label = None
+        self._ticker = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, lambda _: self._tick(), self._ticker)
+        self._ticker.Start(1000)
 
         self.close_btn = wx.Button(self, label='Close')
         self.close_btn.Show(False)
@@ -64,6 +78,40 @@ class TextConsoleFrame(Frame):
 
         self.Show()
         threading.Thread(target=self.capture, args=args, kwargs=kwargs, daemon=True).start()
+
+    @staticmethod
+    def _clock(s):
+        s = max(0, int(round(s)))
+        return f'{s // 3600}:{s % 3600 // 60:02d}:{s % 60:02d}' if s >= 3600 else f'{s // 60}:{s % 60:02d}'
+
+    def _progress(self, done, total, label):
+        """any thread"""
+        wx.CallAfter(self._set_progress, done, total, label, time.monotonic())
+
+    def _set_progress(self, done, total, label, now):
+        if self._run_label != label:
+            self._run_label, self._run = label, (now, done)
+        start, first = self._run
+        pct = min(100.0, done / total * 100) if total else 0.0
+        self.gauge.SetValue(int(pct * 10))
+        secs, did = now - start, done - first
+        eta = secs * (total - done) / did if secs > 2 and did > 0 and done < total else None
+        num = f'{int(pct)}%' if total > 1e6 else f'{done:,} / {total:,}'
+        self._prog = (label, num, eta, now)
+        self._tick()
+
+    def _tick(self):
+        if self.is_done:
+            return
+        now = time.monotonic()
+        parts = [f'Working · {self._clock(now - self._started)}']
+        if self._prog:
+            label, num, eta, at = self._prog
+            parts.append(f'{label} · {num}')
+            if eta is not None:
+                left = eta - (now - at)
+                parts.append(f'{self._clock(left)} left' if left > 1 else 'almost done')
+        self.status.SetLabel('   '.join(parts))
 
     def _update(self, text):
         self.text.AppendText(text)
@@ -86,6 +134,8 @@ class TextConsoleFrame(Frame):
         pass
 
     def _done(self):
+        self._ticker.Stop()
+        self.status.SetLabel(f'Finished in {self._clock(time.monotonic() - self._started)}')
         self.close_btn.Show(True)
         self.complete_callback()
         self.is_done = True
@@ -96,7 +146,7 @@ class TextConsoleFrame(Frame):
 
     def capture(self, *args, **kwargs):
         output = CallbackStringIO(self.update)
-        with capture(output):
+        with capture(output), reporting(self._progress):
             try:
                 self.run(*args, **kwargs)
             except Exception:

@@ -631,27 +631,46 @@ window.__ack = () => { _q.shift(); _s = false; _flush(); };
 window.__respond = r => { const c = _cb[r.id]; if (c) { delete _cb[r.id]; c(r); } };
 window.__console_line = t => { const e = $('con-out'); e.textContent += t; e.scrollTop = e.scrollHeight; };
 // big totals are bytes (optimize), a percentage reads better than 31,122,382,499 / 83,000,000,000
-// time left comes from how fast it's actually going on this pc, not a guess per drive type
-let _pg = null;
-const etaText = s => s < 60 ? 'about ' + Math.max(5, Math.round(s / 5) * 5) + 's left' : 'about ' + Math.round(s / 60) + ' min left';
+// every job gets a clock: time since it started, and time left worked out from how fast it's
+// actually going on this pc. both tick every second, not only when progress comes in
+let _pg = null, _eta = null, _conStart = 0, _conTick = null;
+const clock = s => {
+  s = Math.max(0, Math.round(s));
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = String(s % 60).padStart(2, '0');
+  return h ? h + ':' + String(m).padStart(2, '0') + ':' + ss : m + ':' + ss;
+};
+function tickCon() {
+  const now = performance.now();
+  if ($('con-sp').dataset.running === '1') $('con-sp').textContent = 'Working · ' + clock((now - _conStart) / 1000);
+  if (_pg && _pg.num) {
+    const left = _eta ? _eta.secs - (now - _eta.at) / 1000 : null;
+    $('con-pnum').textContent = _pg.num + (left === null ? '' : ' · ' + (left > 1 ? clock(left) + ' left' : 'almost done'));
+  }
+}
 window.__console_progress = (done, total, label) => {
   const now = performance.now();
-  if (!_pg || _pg.label !== label || done < _pg.done) _pg = { label, start: now, first: done };
+  if (!_pg || _pg.label !== label || done < _pg.done) { _pg = { label, start: now, first: done }; _eta = null; }
   _pg.done = done;
   const pct = total ? Math.min(100, done / total * 100) : 0;
   const secs = (now - _pg.start) / 1000, did = done - _pg.first;
-  const eta = secs > 3 && did > 0 && done < total ? ' · ' + etaText(secs * (total - done) / did) : '';
+  // big totals are bytes (optimize, building), a percentage reads better than 31,122,382,499 / 83,000,000,000
+  _pg.num = total > 1e6 ? Math.floor(pct) + '%' : done.toLocaleString() + ' / ' + total.toLocaleString();
+  _eta = secs > 2 && did > 0 && done < total ? { secs: secs * (total - done) / did, at: now } : null;
   $('con-prog').classList.add('on');
   $('con-pfill').style.width = pct.toFixed(1) + '%';
   $('con-plabel').textContent = label || 'Working';
-  $('con-pnum').textContent = (total > 1e6 ? Math.floor(pct) + '%' : done.toLocaleString() + ' / ' + total.toLocaleString()) + eta;
+  tickCon();
 };
-// say it plainly when it's over. it used to just stop saying working and that was easy to miss
+// say it plainly when it's over, and how long it took
 window.__console_done = status => {
   const ok = status === 'ok' || status === true, cancelled = status === 'cancelled';
+  const took = clock((performance.now() - _conStart) / 1000);
+  clearInterval(_conTick);
+  $('con-sp').dataset.running = '0';
+  _eta = null;
   $('con-close').style.display = '';
   $('con-cancel').style.display = 'none';
-  $('con-sp').textContent = ok ? '✓ Finished' : cancelled ? 'Cancelled' : "Didn't finish, see above";
+  $('con-sp').textContent = ok ? '✓ Finished in ' + took : cancelled ? 'Cancelled after ' + took : "Didn't finish (" + took + '), see above';
   $('con-sp').className = 'working ' + (ok ? 'ok' : cancelled ? '' : 'bad');
   $('con-prog').classList.toggle('bad', !ok && !cancelled);
   if (ok && $('con-prog').classList.contains('on')) { $('con-pfill').style.width = '100%'; $('con-pnum').textContent = 'Done'; }
@@ -1703,10 +1722,15 @@ function openLink(url) { call('open_link', { url }); }
 let _conNotify = true;
 function openCon(title, notify = true, cancellable = true) {
   _conNotify = notify;
+  _conStart = performance.now();
+  _eta = null;
+  clearInterval(_conTick);
+  _conTick = setInterval(tickCon, 1000);
+  $('con-sp').dataset.running = '1';
   $('con-cancel').style.display = cancellable ? '' : 'none';
   $('con-cancel').disabled = false;
   $('con-cancel').textContent = 'Cancel';
-  $('con-sp').textContent = 'Working...';
+  $('con-sp').textContent = 'Working · 0:00';
   $('con-sp').className = 'working';
   $('con-title').textContent = title;
   $('con-out').textContent = '';

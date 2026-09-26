@@ -6,9 +6,9 @@ import re
 import shutil
 import threading
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from large_vcs.progress import track
+from large_vcs.progress import step, track
 
 CDN = 'https://ddragon.leagueoflegends.com'
 _BASE = os.environ.get('LOCALAPPDATA') or os.path.expanduser('~')
@@ -195,8 +195,13 @@ def ensure(version, champions=(), items=(), spells=()):
     jobs = [j for j in jobs if _ok(*j) and not os.path.exists(local_path(*j))]
     if not jobs:
         return 0
+    got = 0
     with ThreadPoolExecutor(max_workers=16) as ex:
-        return sum(ex.map(lambda j: _fetch(*j), jobs))
+        futures = [ex.submit(_fetch, *j) for j in jobs]
+        for done, f in enumerate(as_completed(futures), 1):
+            got += f.result()
+            step(done, len(jobs), f'Downloading icons for {version}')
+    return got
 
 
 def _catalog(version, name):
@@ -263,9 +268,10 @@ def download_for_replays(replays, log=print):
 
     order = sorted(groups, key=_vkey, reverse=True)
     log(f'{len(order)} older patches used by your replays...')
-    with ThreadPoolExecutor(max_workers=4) as ex:
-        for v, nc, ni, got in ex.map(one, order):
-            log(f'  {v}: {nc} champions, {ni} items, {got} new files')
+    # one patch at a time, each one already downloads 16 at once. and it keeps progress on this thread
+    for v in order:
+        v, nc, ni, got = one(v)
+        log(f'  {v}: {nc} champions, {ni} items, {got} new files')
     log('Done.')
 
 
