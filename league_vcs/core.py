@@ -239,7 +239,9 @@ def watch(replay, before_launch=None):
     print(f'Launching replay on patch {game_version}...')
     # launch it the same way the riot client does. never touch the game process
     try:
-        p = subprocess.Popen([game_path, replay], cwd=os.path.dirname(game_path))
+        # minus our webview settings, those are for our window, not the game
+        env = {k: v for k, v in os.environ.items() if not k.startswith('WEBVIEW2_')}
+        p = subprocess.Popen([game_path, replay], cwd=os.path.dirname(game_path), env=env)
     except PermissionError:
         raise UserInputException(launch_refused(game_version)) from None
     p.wait()

@@ -17,6 +17,19 @@ except Exception:
         except Exception:
             pass
 
+# the window is edge underneath. gpu and network run inside the main edge process instead of their own,
+# and the stuff a browser does in the background is off. about 20% less memory, two fewer processes.
+# read once when the first window opens, so it has to be set before that
+os.environ.setdefault('WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS', ' '.join((
+    '--in-process-gpu',
+    '--enable-features=NetworkServiceInProcess2',
+    '--disable-background-networking',
+    '--disable-component-update',
+    '--disable-extensions',
+    '--disable-features=Translate,msEdgeTranslate,OptimizationHints,SpareRendererForSitePerProcess,'
+    'AutofillServerCommunication,msWebOOUI,msPdfOOUI',
+)))
+
 import win32api
 import win32process
 import wx
