@@ -160,6 +160,90 @@ class MySettingsTest(TempDirTest):
             self.assertEqual(core.copy_settings(os.path.join(self.tmp, 'current')), 0)
 
 
+class QuickStartRetryTest(TempDirTest):
+    ZED = r'DATA\FINAL\Champions\Zed.wad.client'
+
+    def setUp(self):
+        super().setUp()
+        from fixtures import make_wad, random_assets
+        from large_vcs import LargeVCS
+        inst = os.path.join(self.tmp, 'inst')
+        os.makedirs(os.path.join(inst, 'DATA', 'FINAL', 'Champions'))
+        with open(os.path.join(inst, 'League of Legends.exe'), 'wb') as f:
+            f.write(b'exe')
+        make_wad(os.path.join(inst, self.ZED), random_assets(5, seed=31), seed=31)
+        self.repo = LargeVCS.load_or_create(os.path.join(self.tmp, 'repo'))
+        self.repo.add(inst, '16.1.1.1')
+        self.old_repo = core.repo
+        core.repo = self.repo
+
+    def tearDown(self):
+        core.repo = self.old_repo
+        self.repo.release()
+        for root, _, files in os.walk(self.tmp):
+            for f in files:
+                os.chmod(os.path.join(root, f), 0o666)
+        super().tearDown()
+
+    def watch(self, game_runs_for):
+        clock = iter([0, game_runs_for, 100, 100 + game_runs_for])
+        rofl = mock.Mock(version='16.1.1.1')
+        rofl.info.players = []
+        with mock.patch.object(core, 'ROFLParser', return_value=rofl),                 mock.patch.object(core, 'quick_start_skip', return_value={self.ZED}),                 mock.patch.object(core, 'quick_start', True), mock.patch.object(core, 'use_my_settings', False),                 mock.patch.object(core.winproc, 'game_running', return_value=False),                 mock.patch.object(core, 'vanguard_preflight', return_value=(None, None)),                 mock.patch.object(core.signing, 'check_game_folder', return_value=None),                 mock.patch.object(core.time, 'monotonic', side_effect=lambda: next(clock)),                 mock.patch.object(core.subprocess, 'Popen') as popen:
+            core.watch('x.rofl')
+        return popen.call_count
+
+    def test_closing_straight_away_builds_the_rest_and_tries_again(self):
+        self.assertEqual(self.watch(game_runs_for=3), 2)
+        self.assertEqual(self.repo.stubs(), set())
+        with open(self.repo.current_path(self.ZED), 'rb') as f:
+            self.assertNotEqual(f.read(), __import__('large_vcs').STUB_WAD)
+
+    def test_a_replay_that_actually_played_is_left_alone(self):
+        self.assertEqual(self.watch(game_runs_for=600), 1)
+        self.assertEqual(self.repo.stubs(), {self.ZED})
+
+
+class PrepareNewestTest(TempDirTest):
+    def setUp(self):
+        super().setUp()
+        from large_vcs import LargeVCS
+        self.repo = LargeVCS.load_or_create(os.path.join(self.tmp, 'repo'))
+        for tag in ('16.1.1.1', '16.2.1.1', '16.10.1.1'):
+            inst = os.path.join(self.tmp, tag)
+            os.makedirs(inst)
+            with open(os.path.join(inst, 'a.dll'), 'w') as f:
+                f.write(tag)
+            self.repo.add(inst, tag)
+        self.old_repo, core.repo = core.repo, self.repo
+
+    def tearDown(self):
+        core.repo = self.old_repo
+        self.repo.release()
+        for root, _, files in os.walk(self.tmp):
+            for f in files:
+                os.chmod(os.path.join(root, f), 0o666)
+        super().tearDown()
+
+    def test_newest_gets_ready_into_a_free_slot(self):
+        self.repo.keep_prepared = 2
+        self.assertTrue(core.prepare_newest_patch())
+        self.assertEqual(self.repo.current(), '16.10.1.1')  # 16.10 is newer than 16.2
+        self.assertFalse(core.prepare_newest_patch())  # already there
+
+    def test_never_pushes_out_what_you_got_ready(self):
+        self.repo.keep_prepared = 2
+        self.repo.restore('16.1.1.1')
+        self.repo.restore('16.2.1.1')  # 16.1 kept, 16.2 current, both slots used
+        self.assertFalse(core.prepare_newest_patch())
+        self.assertEqual((self.repo.current(), self.repo.kept()), ('16.2.1.1', ['16.1.1.1']))
+
+    def test_can_be_turned_off(self):
+        with mock.patch.object(core, 'prepare_newest', False):
+            self.assertFalse(core.prepare_newest_patch())
+        self.assertIsNone(self.repo.current())
+
+
 class ConfigTest(TempDirTest):
     def test_corrupt_config_is_set_aside(self):
         path = os.path.join(self.tmp, 'user_settings.json')

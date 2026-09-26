@@ -24,6 +24,7 @@ class Config(dict):
         'dismissed_update': '',
         'keep_prepared': 2,
         'use_my_settings': True,
+        'prepare_newest': True,
         'quick_start': False,
     }
 

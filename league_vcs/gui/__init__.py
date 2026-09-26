@@ -50,9 +50,11 @@ class GUI:
         self.config = config
         core.keep_prepared = config.get('keep_prepared', 2)
         core.use_my_settings = config.get('use_my_settings', True)
+        core.prepare_newest = config.get('prepare_newest', True)
         core.game_exes = config.get('game_paths') or []
-        # quick start builds champion archives as empty placeholders. off until it's been tested properly
-        core.quick_start = False
+        # builds champion archives nobody in the replay uses as empty placeholders. off unless asked for,
+        # and if a replay closes straight away the rest gets built and it tries again
+        core.quick_start = config.get('quick_start', False)
         self.app = wx.App()
         try:
             self.app.MSWEnableDarkMode(wx.App.DarkMode_Always)
@@ -341,6 +343,8 @@ class GUI:
                                  text=str(e))
                 return
 
+            # nothing stored yet means someone just set this up and is waiting on it
+            first = not core.repo.list()
             to_update = []
             new_versions = set()
             for game_path in self.config['game_paths']:
@@ -370,11 +374,18 @@ class GUI:
                              title='No new patches found.',
                              text='Your repository is up to date!')
 
+            stopped = False
             for game_path, version in to_update:
                 try:
-                    # half the cores. storing in the background shouldn't max out the pc
-                    core.add(os.path.dirname(game_path), workers=max(2, (os.cpu_count() or 4) // 2))
+                    if first:
+                        # full speed for the very first one. still stops the moment a game starts
+                        self.set_high_priority()
+                        core.add(os.path.dirname(game_path))
+                    else:
+                        # half the cores. storing in the background shouldn't max out the pc
+                        core.add(os.path.dirname(game_path), workers=max(2, (os.cpu_count() or 4) // 2))
                 except Cancelled:
+                    stopped = True
                     print(f'Stopped storing {version}, a game started. Next check carries on.')
                     break
                 except UserInputException as e:
@@ -384,9 +395,20 @@ class GUI:
                     print(f'Skipped {version}: {e}')
                     self.notify(f"Couldn't store patch {version}", 'Check the log in the logs folder for details.')
                     continue
+                finally:
+                    if first and not self.settings_frame:
+                        self.set_low_priority()
                 wx.CallAfter(self.tray_icon.ShowBalloon,
                              title=f'Stored patch {version}',
                              text='Replays from this patch can now be watched.')
+
+            if not stopped:
+                try:
+                    core.prepare_newest_patch()
+                except Cancelled:
+                    print('Stopped getting the newest patch ready, a game started. Next check carries on.')
+                except Exception as e:
+                    print(f"Couldn't get the newest patch ready: {e}")
 
         wx.CallAfter(self.update_tray_menu)
         winproc.trim_memory()

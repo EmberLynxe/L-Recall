@@ -212,6 +212,7 @@ class SettingsFrame(CallbackFrame):
             'auto_download_assets': self.config.get('auto_download_assets', True),
             'keep_prepared': self.config.get('keep_prepared', 2),
             'use_my_settings': self.config.get('use_my_settings', True),
+            'prepare_newest': self.config.get('prepare_newest', True),
             'quick_start': self.config.get('quick_start', False),
         })
 
@@ -577,6 +578,10 @@ class SettingsFrame(CallbackFrame):
                 core.repo.keep_prepared = core.keep_prepared
         if 'settings' in msg:
             core.use_my_settings = self.config['use_my_settings'] = bool(msg['settings'])
+        if 'quick' in msg:
+            core.quick_start = self.config['quick_start'] = bool(msg['quick'])
+        if 'newest' in msg:
+            core.prepare_newest = self.config['prepare_newest'] = bool(msg['newest'])
         self.config.save()
         self._respond(req_id, True)
 

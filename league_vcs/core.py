@@ -8,7 +8,7 @@ import subprocess
 import time
 from typing import Optional
 
-from large_vcs import LargeVCS, progress
+from large_vcs import LargeVCS, _version_key, progress
 
 from league_vcs import signing, winproc
 from league_vcs.exceptions import UserInputException
@@ -20,6 +20,7 @@ repo: Optional[LargeVCS] = None
 keep_prepared = 2
 quick_start = False
 use_my_settings = True
+prepare_newest = True
 game_exes = []  # from the config, checked before auto detect
 
 
@@ -50,6 +51,24 @@ def quick_start_skip(version, players):
             if name in champions and name not in playing:
                 skip.add(rel)
     return skip
+
+
+def prepare_newest_patch():
+    """most replays people open are from the last few days, so get the newest stored patch built before
+    anyone clicks watch. only into a free keep ready slot, never pushing out a patch someone prepared
+    themselves. true if it built something"""
+    tags = repo.list()
+    if not prepare_newest or not tags:
+        return False
+    newest = max(tags, key=_version_key)
+    current, kept = repo.current(), repo.kept()
+    if newest == current or newest in kept:
+        return False
+    if current is not None and len(kept) >= repo.keep_prepared - 1:
+        return False
+    print(f'Getting patch {newest} ready ahead of time...')
+    repo.restore(newest)
+    return True
 
 
 def can_update(game_path):
@@ -261,7 +280,27 @@ def watch(replay, before_launch=None):
 
     print(f'Preparing patch {game_version}...')
     repo.restore(game_version, skip=quick_start_skip(game_version, rofl.info.players) if quick_start else ())
+    placeholders = bool(repo.stubs())
+    ran, repair = _launch(game_version, replay, before_launch)
+    if placeholders and (ran < QUICK_START_GRACE or repair):
+        # quick start left something out the game wanted. fill everything in and go again, once
+        print('The replay closed straight away, most likely because Quick start left out something it '
+              'needed. Building the rest of the patch and trying again...')
+        repo.restore(game_version)
+        _launch(game_version, replay, before_launch)
 
+
+# a replay that closes this fast after a quick start didn't really start
+QUICK_START_GRACE = 15
+
+
+def _repair_notes():
+    """where the game leaves SOFT_REPAIR when it's missing something (seen next to the game folder)"""
+    return [os.path.join(repo.root, 'SOFT_REPAIR'), repo.current_path('SOFT_REPAIR')]
+
+
+def _launch(game_version, replay, before_launch):
+    """returns (seconds the game ran, whether it left a repair note)"""
     game_path = repo.current_path(GameParser.executable_name)
     problem = signing.check_game_folder(repo.current_path(), GameParser.executable_name)
     if problem:
@@ -276,8 +315,14 @@ def watch(replay, before_launch=None):
     progress.check()
     if before_launch:
         before_launch()
+    for note in _repair_notes():
+        try:
+            os.unlink(note)  # an old one from last time would look like this launch failed
+        except OSError:
+            pass
     print(f'Launching replay on patch {game_version}...')
     # launch it the same way the riot client does. never touch the game process
+    started = time.monotonic()
     try:
         # minus our webview settings, those are for our window, not the game
         env = {k: v for k, v in os.environ.items() if not k.startswith('WEBVIEW2_')}
@@ -285,6 +330,18 @@ def watch(replay, before_launch=None):
     except PermissionError:
         raise UserInputException(launch_refused(game_version)) from None
     p.wait()
+    ran = time.monotonic() - started
+    repair = False
+    for note in _repair_notes():
+        if os.path.exists(note):
+            repair = True
+            try:
+                with open(note, encoding='utf-8', errors='replace') as f:
+                    print(f'The game reported a problem: {f.read(300).strip()}')
+                os.unlink(note)
+            except OSError:
+                pass
+    return ran, repair
 
 
 PRECHECK_OFF = ('Vanguard Pre-Check is off on this PC, so Vanguard is always on, and that blocks replays '
