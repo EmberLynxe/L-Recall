@@ -4,6 +4,7 @@ import os
 import shutil
 import tempfile
 import threading
+import time
 import unittest
 from unittest import mock
 
@@ -49,6 +50,19 @@ class AssetPathTest(unittest.TestCase):
         with mock.patch.object(assets, '_fetch') as fetch:
             self.assertEqual(assets.ensure('15.14.1', champions=[r'..\..\evil']), 0)
             fetch.assert_not_called()
+
+
+class AssetVersionsTest(TempDirTest):
+    def test_saved_patch_list_doesnt_wait_for_the_network(self):
+        with open(os.path.join(self.tmp, 'versions.json'), 'w') as f:
+            f.write('["16.19.1", "16.18.1"]')
+        slow = threading.Event()
+        with mock.patch.object(assets, 'ROOT', self.tmp), mock.patch.object(assets, '_versions', None), \
+                mock.patch.object(assets, '_get', side_effect=lambda *a, **k: slow.wait(5) or b'[]'):
+            t = time.perf_counter()
+            self.assertEqual(assets.versions(), ['16.19.1', '16.18.1'])
+            self.assertLess(time.perf_counter() - t, 1)
+            slow.set()
 
 
 class SigningTest(TempDirTest):

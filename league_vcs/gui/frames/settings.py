@@ -61,6 +61,8 @@ class SettingsFrame(CallbackFrame):
         self.SetBackgroundColour(wx.Colour(11, 15, 20))
         self.config = config
         self._notify = notify
+        self._icons_done = frozenset()
+        self._icons_lock = threading.Lock()
         self._quit_app = quit_app
         self._replays = []
         self.notes = Notes(os.path.join(os.path.dirname(config._path), 'replay_notes.json'))
@@ -214,6 +216,7 @@ class SettingsFrame(CallbackFrame):
 
         folders = self.config.get('replay_folders', [])
         self._replays = scan_replays(folders)
+        self._cache_icons_for(self._replays)
 
         result = []
         for r in self._replays:
@@ -244,6 +247,25 @@ class SettingsFrame(CallbackFrame):
             'stored': sorted(stored, reverse=True),
             'repo_ok': repo is not None,
         })
+
+    def _cache_icons_for(self, replays):
+        """icons for every patch your replays are on, quietly, in the background. only what's missing.
+        before this, older patches pulled every icon off the cdn each time you opened a game"""
+        if not self.config.get('auto_download_assets', True):
+            return
+        patches = frozenset(r.patch_short for r in replays)
+        if patches <= self._icons_done or not self._icons_lock.acquire(blocking=False):
+            return
+
+        def run():
+            try:
+                assets.download_for_replays(replays, log=lambda *_: None)
+                self._icons_done |= patches
+            except Exception:
+                pass
+            finally:
+                self._icons_lock.release()
+        threading.Thread(target=run, daemon=True).start()
 
     def _repo_or_none(self):
         path = self.config.get('repository')

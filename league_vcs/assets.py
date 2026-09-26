@@ -40,23 +40,35 @@ def _save(path, data):
 
 
 def versions():
+    """patch list. the saved copy right away if there is one, the fresh one gets fetched in the
+    background. waiting on riot's cdn here held up the whole replay list on every launch"""
     global _versions
     with _lock:
         if _versions is not None:
             return _versions
-        cache = os.path.join(ROOT, 'versions.json')
         try:
-            data = _get(CDN + '/api/versions.json')
-            found = [v for v in json.loads(data) if v[:1].isdigit()]
-            _save(cache, json.dumps(found).encode())
-        except Exception:
-            try:
-                with open(cache) as f:
-                    found = json.load(f)
-            except (OSError, ValueError):
-                found = []
+            with open(os.path.join(ROOT, 'versions.json')) as f:
+                saved = json.load(f)
+        except (OSError, ValueError):
+            saved = None
+        if saved:
+            _versions = saved
+            threading.Thread(target=_fetch_versions, daemon=True).start()
+            return saved
+    return _fetch_versions()
+
+
+def _fetch_versions():
+    global _versions
+    try:
+        found = [v for v in json.loads(_get(CDN + '/api/versions.json')) if v[:1].isdigit()]
+        _save(os.path.join(ROOT, 'versions.json'), json.dumps(found).encode())
+    except Exception:
+        with _lock:
+            return _versions or []
+    with _lock:
         _versions = found
-        return found
+    return found
 
 
 def version_for(patch):
@@ -135,7 +147,7 @@ def _catalog(version, name):
 # about a thousand small pngs, only the first time
 def prefetch_latest():
     """every champ/item/spell icon for the newest patch"""
-    vs = versions()
+    vs = _fetch_versions()  # background anyway, so ask for the real newest
     if not vs:
         return 0
     v = vs[0]
@@ -233,10 +245,7 @@ def ensure_rune_icons(table, ids):
 
 
 def refresh():
-    global _versions
-    with _lock:
-        _versions = None
-    return versions()
+    return _fetch_versions()
 
 
 def cache_info():
