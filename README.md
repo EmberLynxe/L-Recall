@@ -69,6 +69,15 @@ Easiest is to just leave Vanguard on.
 - Coming from League VCS? Point L-Recall at your old storage folder in Settings and hit Optimize on the Patches tab to shrink it. Anything that can't be checked against the original gets left alone.
 - It only connects to two things: Riot's Data Dragon CDN for champion and item icons, and GitHub to check for new versions (you can turn that off in Settings). Nothing about you or your replays gets sent anywhere.
 
+## What to expect
+
+How heavy it is depends a lot on your PC, mostly your drive.
+
+- **Disk space:** the first patch is a full copy, about 25 to 30 GB, and each patch after that usually adds a few GB. Patches kept ready to play take about 25 to 30 GB each on top of that (Settings > Starting replays).
+- **Storing a new patch** happens in the background at low priority once the Riot Client has finished updating. It reads the whole game folder once, so expect some disk activity for a few minutes. It waits if you're in a game.
+- **Watching a replay on a patch that isn't ready yet** means building that patch's game files first. On an NVMe SSD a full patch takes around a minute and a half. SATA SSDs take longer and hard drives a lot longer. The progress bar shows how long is left based on how fast it's actually going on your PC.
+- **Going back to a patch that's kept ready** is instant.
+
 ## Uninstalling
 
 Settings > Uninstall. It removes the startup entry, the icon cache, your settings and the program files, then closes. Stored patches stay unless you tick the box, so a later install can pick them up again. Your replay files are never touched.
