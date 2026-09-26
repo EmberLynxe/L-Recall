@@ -195,7 +195,8 @@ class VanguardCheckTest(unittest.TestCase):
         self.assertTrue(vanguard.status()['installed'] in (True, False, None))
 
     def refused(self, version, live=None, **st):
-        with mock.patch.object(vanguard, 'status', return_value=self.status(**st)),                 mock.patch.object(core, 'detect_game_exe', return_value='x' if live else None),                 mock.patch.object(core, 'GameParser', return_value=mock.Mock(version=live)):
+        with mock.patch.object(vanguard, 'status', return_value=self.status(**st)), \
+                mock.patch.object(core, 'installed_version', return_value=live):
             return core.launch_refused(version)
 
     def test_blocked_launch_says_why(self):
@@ -204,13 +205,24 @@ class VanguardCheckTest(unittest.TestCase):
         self.assertIn('tray icon', self.refused('14.1.1'))
         self.assertIn('Antivirus', self.refused('16.10.1', running=False))
 
+    def test_vanguard_from_boot_always_warns(self):
+        with mock.patch.object(vanguard, 'status', return_value=self.status()), \
+                mock.patch.object(core, 'installed_version', return_value='16.19.1'):
+            level, message = core.vanguard_preflight('14.1.1', warn_old=False)
+            self.assertEqual(level, 'warn')
+            self.assertIn('Exit Vanguard', message)
+            level, message = core.vanguard_preflight('16.10.1')
+            self.assertIn('Pre-Check', message)
+            self.assertNotIn('League client', message)
+            self.assertIn('League client', core.vanguard_preflight('16.19.1')[1])
+
     def test_old_patch_warns_only_when_asked(self):
-        with mock.patch.object(vanguard, 'status', return_value=self.status(running=True)):
+        with mock.patch.object(vanguard, 'status', return_value=self.status(mode='on_demand')):
             self.assertEqual(core.vanguard_preflight('14.1.1')[0], 'warn')
             self.assertEqual(core.vanguard_preflight('14.1.1', warn_old=False), (None, None))
 
     def test_all_clear(self):
-        with mock.patch.object(vanguard, 'status', return_value=self.status(running=True)):
+        with mock.patch.object(vanguard, 'status', return_value=self.status(mode='on_demand')):
             self.assertEqual(core.vanguard_preflight('16.19.1'), (None, None))
 
     def test_process_list_needs_no_handles(self):

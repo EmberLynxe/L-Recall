@@ -196,6 +196,18 @@ def vanguard_preflight(version, warn_old=True):
             return 'block', (f'Patch {version} needs Riot Vanguard, which isn\'t installed. '
                              'Install it from the Riot Client, restart, then try again.')
         return None, None
+    if st['running'] and st['mode'] == 'boot':
+        # loaded before the game starts, so it refuses copies the riot client didn't launch
+        if not new:
+            return 'warn', ('Riot Vanguard is running and starts with Windows on this PC, so it will block this '
+                            'replay. Exit Vanguard from its tray icon first, then watch. You\'ll need to restart '
+                            'your PC before you can play League again.')
+        msg = (f'Riot Vanguard starts with Windows on this PC, so it will block this replay. Patch {version} '
+               'also needs Vanguard, so exiting it won\'t help either. Replays from 14.9 on only play in L-Recall '
+               'with Vanguard\'s Pre-Check turned on.')
+        if installed_version() == version:
+            msg += ' This one\'s on the patch you have installed, so you can watch it from the League client.'
+        return 'warn', msg
     if new and not st['running']:
         if st['mode'] == 'on_demand':
             # pre-check: it starts with a riot game, so not running yet is normal
@@ -244,6 +256,14 @@ def watch(replay, before_launch=None):
     p.wait()
 
 
+def installed_version():
+    live = detect_game_exe()
+    try:
+        return GameParser(live).version if live else None
+    except Exception:
+        return None
+
+
 def launch_refused(version):
     """windows said no to starting the game. with vanguard loaded from boot that's vanguard
     refusing a copy the riot client didn't start. we don't try to get past that, ever"""
@@ -254,12 +274,7 @@ def launch_refused(version):
                 'suspect, check whether it blocked League of Legends.exe in the storage folder.')
     msg = (f'Windows wouldn\'t start patch {version}. Riot Vanguard is running and blocked it, '
            'which it does to game copies the Riot Client didn\'t start. L-Recall won\'t try to get around that.')
-    live = detect_game_exe()
-    try:
-        live_version = GameParser(live).version if live else None
-    except Exception:
-        live_version = None
-    if live_version == version:
+    if installed_version() == version:
         return msg + ' This replay is on the patch you have installed, so open it from the League client instead.'
     if not needs_vanguard(version):
         return msg + (' This patch is from before Vanguard, so you can exit Vanguard from its tray icon '
