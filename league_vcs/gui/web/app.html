@@ -636,33 +636,48 @@ window.__console_line = t => { const e = $('con-out'); e.textContent += t; e.scr
 // big totals are bytes (optimize), a percentage reads better than 31,122,382,499 / 83,000,000,000
 // every job gets a clock: time since it started, and time left worked out from how fast it's
 // actually going on this pc. both tick every second, not only when progress comes in
-let _pg = null, _eta = null, _conStart = 0, _conTick = null;
+let _pg = null, _eta = null, _conStart = 0, _conTick = null, _left = null, _leftAt = 0;
 const clock = s => {
   s = Math.max(0, Math.round(s));
   const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = String(s % 60).padStart(2, '0');
   return h ? h + ':' + String(m).padStart(2, '0') + ':' + ss : m + ':' + ss;
 };
-function tickCon() {
+// the raw estimate swings about, big archives finish in lumps. the shown one ticks down once a
+// second and drifts towards it. ahead of schedule it catches up quick, a bit behind it just slows
+// down instead of counting back up, and it only climbs if it's clearly way off
+function easeLeft(target, now) {
+  if (_left === null) { _left = target; _leftAt = now; return; }
+  const dt = (now - _leftAt) / 1000;
+  _leftAt = now;
+  let next = _left - dt;
+  const off = target - next;
+  if (off < 0) next += off * 0.3;
+  else if (off > Math.max(10, next * 0.25)) next += off * 0.2;
+  else next += Math.min(off * 0.2, dt);
+  _left = Math.max(0, next);
+}
+function tickCon(step) {
   const now = performance.now();
   if ($('con-sp').dataset.running === '1') $('con-sp').textContent = 'Working · ' + clock((now - _conStart) / 1000);
   if (_pg && _pg.num) {
-    const left = _eta ? _eta.secs - (now - _eta.at) / 1000 : null;
-    $('con-pnum').textContent = _pg.num + (left === null ? '' : ' · ' + (left > 1 ? clock(left) + ' left' : 'almost done'));
+    if (!_eta) _left = null;
+    else if (step !== false) easeLeft(_eta.secs - (now - _eta.at) / 1000, now);
+    $('con-pnum').textContent = _pg.num + (_left === null ? '' : ' · ' + (_left > 1 ? clock(_left) + ' left' : 'almost done'));
   }
 }
 window.__console_progress = (done, total, label) => {
   const now = performance.now();
-  if (!_pg || _pg.label !== label || done < _pg.done) { _pg = { label, start: now, first: done }; _eta = null; }
+  if (!_pg || _pg.label !== label || done < _pg.done) { _pg = { label, start: now, first: done }; _eta = null; _left = null; }
   _pg.done = done;
   const pct = total ? Math.min(100, done / total * 100) : 0;
   const secs = (now - _pg.start) / 1000, did = done - _pg.first;
   // big totals are bytes (optimize, building), a percentage reads better than 31,122,382,499 / 83,000,000,000
   _pg.num = total > 1e6 ? Math.floor(pct) + '%' : done.toLocaleString() + ' / ' + total.toLocaleString();
-  _eta = secs > 2 && did > 0 && done < total ? { secs: secs * (total - done) / did, at: now } : null;
+  _eta = secs > 3 && did > 0 && done < total ? { secs: secs * (total - done) / did, at: now } : null;
   $('con-prog').classList.add('on');
   $('con-pfill').style.width = pct.toFixed(1) + '%';
   $('con-plabel').textContent = label || 'Working';
-  tickCon();
+  tickCon(false);
 };
 // say it plainly when it's over, and how long it took
 window.__console_done = status => {
@@ -670,7 +685,7 @@ window.__console_done = status => {
   const took = clock((performance.now() - _conStart) / 1000);
   clearInterval(_conTick);
   $('con-sp').dataset.running = '0';
-  _eta = null;
+  _eta = _left = null;
   $('con-close').style.display = '';
   $('con-cancel').style.display = 'none';
   $('con-sp').textContent = ok ? '✓ Finished in ' + took : cancelled ? 'Cancelled after ' + took : "Didn't finish (" + took + '), see above';
@@ -1735,7 +1750,7 @@ let _conNotify = true;
 function openCon(title, notify = true, cancellable = true) {
   _conNotify = notify;
   _conStart = performance.now();
-  _eta = null;
+  _eta = _left = null;
   clearInterval(_conTick);
   _conTick = setInterval(tickCon, 1000);
   $('con-sp').dataset.running = '1';

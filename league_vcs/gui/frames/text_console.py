@@ -63,8 +63,10 @@ class TextConsoleFrame(Frame):
         self._started = time.monotonic()
         self._prog = None  # (label, pct text, eta seconds, when)
         self._run_label = None
+        self._left = None  # what the countdown shows, see _ease
+        self._left_at = 0
         self._ticker = wx.Timer(self)
-        self.Bind(wx.EVT_TIMER, lambda _: self._tick(), self._ticker)
+        self.Bind(wx.EVT_TIMER, lambda _: self._tick(step=True), self._ticker)
         self._ticker.Start(1000)
 
         self.close_btn = wx.Button(self, label='Close')
@@ -91,16 +93,34 @@ class TextConsoleFrame(Frame):
     def _set_progress(self, done, total, label, now):
         if self._run_label != label:
             self._run_label, self._run = label, (now, done)
+            self._left = None
         start, first = self._run
         pct = min(100.0, done / total * 100) if total else 0.0
         self.gauge.SetValue(int(pct * 10))
         secs, did = now - start, done - first
-        eta = secs * (total - done) / did if secs > 2 and did > 0 and done < total else None
+        eta = secs * (total - done) / did if secs > 3 and did > 0 and done < total else None
         num = f'{int(pct)}%' if total > 1e6 else f'{done:,} / {total:,}'
         self._prog = (label, num, eta, now)
         self._tick()
 
-    def _tick(self):
+    def _ease(self, target, now):
+        # same as the main window: tick down once a second and drift towards the estimate,
+        # catch up quick when it's ahead, slow down instead of counting back up when it's a bit behind
+        if self._left is None:
+            self._left, self._left_at = target, now
+            return
+        dt, self._left_at = now - self._left_at, now
+        nxt = self._left - dt
+        off = target - nxt
+        if off < 0:
+            nxt += off * 0.3
+        elif off > max(10, nxt * 0.25):
+            nxt += off * 0.2
+        else:
+            nxt += min(off * 0.2, dt)
+        self._left = max(0.0, nxt)
+
+    def _tick(self, step=False):
         if self.is_done:
             return
         now = time.monotonic()
@@ -108,9 +128,12 @@ class TextConsoleFrame(Frame):
         if self._prog:
             label, num, eta, at = self._prog
             parts.append(f'{label} · {num}')
-            if eta is not None:
-                left = eta - (now - at)
-                parts.append(f'{self._clock(left)} left' if left > 1 else 'almost done')
+            if eta is None:
+                self._left = None
+            elif step:
+                self._ease(eta - (now - at), now)
+            if self._left is not None:
+                parts.append(f'{self._clock(self._left)} left' if self._left > 1 else 'almost done')
         self.status.SetLabel('   '.join(parts))
 
     def _update(self, text):

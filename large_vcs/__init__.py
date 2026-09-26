@@ -10,7 +10,7 @@ import signal
 import stat
 import threading
 from contextlib import contextmanager
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, as_completed, wait
 from multiprocessing import Pool
 
 from .progress import Cancelled, check, step, track
@@ -681,7 +681,7 @@ class LargeVCS:
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
         load_from_repo(self.repo_path('files', checksum), full_path)
 
-    def _build_wad(self, checksum, output_path):
+    def _build_wad(self, checksum, output_path, progress=None):
         from league_vcs.parsers.wad import pack_wad, pack_wad_exact
 
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -689,7 +689,7 @@ class LargeVCS:
         if manifest is None:
             load_from_repo(os.path.join(self.files_dir, checksum), output_path)
         elif 'segments' in manifest:
-            pack_wad_exact(manifest, self.files_dir, output_path, self.packs)
+            pack_wad_exact(manifest, self.files_dir, output_path, self.packs, progress)
         else:
             pack_wad(manifest, self.files_dir, output_path)
 
@@ -788,16 +788,32 @@ class LargeVCS:
             wads.sort(key=lambda x: sizes[x[0]], reverse=True)
             total = sum(sizes.values())
             print(f'Building patch {tag}: {len(wads)} archives, {total / 1024 ** 3:.1f} GB ({WORKERS} threads)...')
-            done = 0
-            step(0, total, f'Building patch {tag}')
+            # counted as bytes get written, not when a whole archive finishes. biggest go first and 16 run at
+            # once, so counting finished ones sat near 0% for ages and made the time left useless
+            label = f'Building patch {tag}'
+            count_lock, counted, per_wad = threading.Lock(), [0], {}
+
+            def build(cs, rp):
+                def wrote(n):
+                    with count_lock:
+                        counted[0] += n
+                        per_wad[rp] = per_wad.get(rp, 0) + n
+                self._build_wad(cs, self.current_path(rp), wrote)
+
+            step(0, total, label)
             with _pool(WORKERS) as executor:
-                futures = {executor.submit(self._build_wad, cs, self.current_path(rp)): (cs, rp) for cs, rp in wads}
-                for future in as_completed(futures):
-                    future.result()
-                    cs, rp = futures[future]
-                    stubs.discard(rp)
-                    done += sizes[cs]
-                    step(done, total, f'Building patch {tag}')
+                futures = {executor.submit(build, cs, rp): (cs, rp) for cs, rp in wads}
+                pending = set(futures)
+                while pending:
+                    finished, pending = wait(pending, timeout=0.25, return_when=FIRST_COMPLETED)
+                    for future in finished:
+                        future.result()
+                        cs, rp = futures[future]
+                        stubs.discard(rp)
+                        # whatever it didn't report as it went (old formats don't)
+                        with count_lock:
+                            counted[0] += max(0, sizes[cs] - per_wad.get(rp, 0))
+                    step(min(counted[0], total), total, label)
 
         self._save_stubs(stubs)
         _write_json_atomic(self.current_patch_path, tag)

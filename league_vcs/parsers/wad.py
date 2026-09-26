@@ -409,11 +409,17 @@ def unpack_wad_exact(wad_path, files_dir, known, expected_sha=None, writer=None)
     }
 
 
-def pack_wad_exact(manifest, files_dir, output_path, packs=None):
+def pack_wad_exact(manifest, files_dir, output_path, packs=None, progress=None):
+    """progress(bytes) gets called every few mb written, so big archives don't sit at 0 until they're done"""
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     zeros = bytes(BLOCK_SIZE)
+    unreported = 0
     with open(output_path, 'wb', buffering=BLOCK_SIZE * 8) as out:
         for digest, size in manifest['segments']:
+            if progress and unreported >= BLOCK_SIZE * 8:
+                progress(unreported)
+                unreported = 0
+            unreported += size
             if digest is None:
                 while size:
                     n = min(size, BLOCK_SIZE)
@@ -434,6 +440,8 @@ def pack_wad_exact(manifest, files_dir, output_path, packs=None):
                     remaining -= len(chunk)
             finally:
                 os.close(fd)
+    if progress and unreported:
+        progress(unreported)
 
 
 def manifest_hashes(manifest):

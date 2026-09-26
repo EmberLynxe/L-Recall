@@ -78,6 +78,16 @@ class StorageTest(RepoTest):
         report = self.repo.storage_report()[0]
         self.assertEqual((report['exact'], report['whole']), (2, 0))
 
+    def test_building_reports_bytes_as_it_goes(self):
+        inst = self.install('p1', {r'DATA\big.wad.client': ('wad', random_assets(60, seed=7, size=(40, 400000)), 7)})
+        self.repo.add(inst, 'P1')
+        checksum = next(iter(self.repo.get_patch('P1')))
+        calls = []
+        out = os.path.join(self.tmp, 'out.wad.client')
+        self.repo._build_wad(checksum, out, calls.append)
+        self.assertGreater(len(calls), 1)
+        self.assertEqual(sum(calls), os.path.getsize(out))
+
     def test_switching_patches_handles_changed_and_moved_files(self):
         assets = random_assets(25, seed=2)
         p1 = self.install('p1', {'a\\foo.dll': b'same bytes', r'DATA\x.wad.client': ('wad', assets, 3)})
