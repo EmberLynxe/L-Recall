@@ -218,7 +218,7 @@ class SettingsFrame(CallbackFrame):
 
     def _handle_get_replays(self, req_id, _msg):
         repo = self._repo_or_none()
-        stored = set(repo.list()) if repo else set()
+        stored = repo.list() if repo else []
 
         folders = self.config.get('replay_folders', [])
         self._replays = scan_replays(folders)
@@ -226,8 +226,10 @@ class SettingsFrame(CallbackFrame):
 
         result = []
         for r in self._replays:
-            available = r.version in stored
+            client = core.client_for(r.version, stored) if r.version else None
+            available = client is not None
             result.append({
+                'client': client,
                 'date': r.date_str,
                 'ts': r.creation_date.timestamp() if r.creation_date else 0,
                 'version': r.version,

@@ -1445,7 +1445,8 @@ async function loadP() {
   try { patches = await call('get_patches'); } catch (e) { patches = []; }
   renderP();
 }
-const replayCount = v => replays.filter(r => r.version === v).length;
+// replays each stored build ends up playing, same patch builds included
+const replayCount = v => replays.filter(r => (r.client || r.version) === v).length;
 const shortV = v => v.split('.').slice(0, 2).join('.');
 function renderP() {
   $('p-count').textContent = patches.length ? patches.length : '';
@@ -1459,8 +1460,8 @@ function renderP() {
   }).join('') : '<div class="empty">No patches stored yet.</div>';
   loadCosts();
 
-  const have = new Set(patches.map(p => p.version)), need = {};
-  for (const r of replays) if (r.version && !have.has(r.version)) need[r.version] = (need[r.version] || 0) + 1;
+  const need = {};
+  for (const r of replays) if (r.version && r.status !== 'Ready') need[r.version] = (need[r.version] || 0) + 1;
   const miss = Object.keys(need).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
   $('miss-grp').style.display = miss.length ? '' : 'none';
   $('miss-list').innerHTML = miss.map(v => '<div class="prow"><span></span><span class="v">' + esc(shortV(v)) + '</span><span class="b">' + esc(v) + '</span><span>' + plural(need[v], 'replay') + '</span><span></span><span></span></div>').join('');

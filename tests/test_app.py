@@ -244,6 +244,20 @@ class PrepareNewestTest(TempDirTest):
         self.assertIsNone(self.repo.current())
 
 
+class SamePatchTest(unittest.TestCase):
+    TAGS = ['16.18.817.5716', '16.19.820.7193', '16.19.821.7343', '16.19.822.100']
+
+    def test_exact_build_first(self):
+        self.assertEqual(core.client_for('16.19.820.7193', self.TAGS), '16.19.820.7193')
+
+    def test_otherwise_newest_build_of_the_same_patch(self):
+        self.assertEqual(core.client_for('16.19.819.1', self.TAGS), '16.19.822.100')
+
+    def test_never_a_different_patch(self):
+        self.assertIsNone(core.client_for('16.17.1.1', self.TAGS))
+        self.assertIsNone(core.client_for('16.1.800.1', self.TAGS))  # 16.1 isn't 16.19
+
+
 class ConfigTest(TempDirTest):
     def test_corrupt_config_is_set_aside(self):
         path = os.path.join(self.tmp, 'user_settings.json')

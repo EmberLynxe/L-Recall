@@ -53,6 +53,18 @@ def quick_start_skip(version, players):
     return skip
 
 
+def client_for(version, tags=None):
+    """which stored build plays a replay from this version. the exact build if it's stored, otherwise the
+    newest build of the same patch (16.19.820 on 16.19.821), which is what the league client does too.
+    None if nothing from that patch is stored"""
+    tags = repo.list() if tags is None else tags
+    if version in tags:
+        return version
+    patch = version.split('.')[:2]
+    same = [t for t in tags if t.split('.')[:2] == patch]
+    return max(same, key=_version_key) if same else None
+
+
 def prepare_newest_patch():
     """most replays people open are from the last few days, so get the newest stored patch built before
     anyone clicks watch. only into a free keep ready slot, never pushing out a patch someone prepared
@@ -269,9 +281,12 @@ def copy_settings(game_folder):
 
 def watch(replay, before_launch=None):
     rofl = ROFLParser(replay)
-    game_version = rofl.version
-    if game_version not in repo.list():
-        raise UserInputException(f'No game client found for patch {game_version}.')
+    game_version = client_for(rofl.version)
+    if game_version is None:
+        raise UserInputException(f'No game client found for patch {rofl.version}.')
+    if game_version != rofl.version:
+        print(f'Build {rofl.version} isn\'t stored, so this plays on {game_version} from the same patch, '
+              'like the League client does.')
     if winproc.game_running():
         raise UserInputException('A game is already running. Close it before watching a replay.')
     level, message = vanguard_preflight(game_version)
