@@ -5,6 +5,7 @@ import shutil
 import stat
 import struct
 import tempfile
+import threading
 import unittest
 from unittest import mock
 
@@ -216,6 +217,47 @@ class DeleteTest(RepoTest):
             self.repo.restore('P1')
         linking = [s for s in seen if s[2] == 'Linking files']
         self.assertEqual((linking[0][0], linking[-1]), (0, (50, 50, 'Linking files')))
+
+
+class CancelTest(RepoTest):
+    def cancel_after(self, n):
+        from large_vcs.progress import reporting
+        ev, seen = threading.Event(), []
+
+        def cb(done, total, label):
+            seen.append(label)
+            if len(seen) >= n:
+                ev.set()
+        return reporting(cb, ev)
+
+    def test_cancelled_restore_gets_rebuilt_properly_next_time(self):
+        from large_vcs.progress import Cancelled
+        inst = self.install('p1', {f'DATA\\w{i}.wad.client': ('wad', random_assets(5, seed=40 + i), 40 + i) for i in range(12)})
+        self.repo.add(inst, 'P1')
+        with self.cancel_after(1), self.assertRaises(Cancelled):
+            self.repo.restore('P1')
+        self.assertIsNone(self.repo.current())
+        self.repo.restore('P1')
+        self.assertStagedEqual(inst)
+
+    def test_cancelled_optimize_keeps_what_it_finished(self):
+        from large_vcs.progress import Cancelled
+        inst = self.install('p1', {f'DATA\\w{i}.wad.client': ('wad', random_assets(10, seed=50 + i), 50 + i) for i in range(8)})
+        patch = {}
+        for i in range(8):
+            src = os.path.join(inst, f'DATA\\w{i}.wad.client')
+            digest = hash_file(src)
+            shutil.copyfile(src, os.path.join(self.repo.files_dir, digest))
+            patch[digest] = f'DATA\\w{i}.wad.client'
+        with open(self.repo.repo_path('patches', 'OLD.json'), 'w') as f:
+            json.dump(patch, f)
+        with mock.patch('league_vcs.winproc.game_running', return_value=False), \
+                self.cancel_after(1), self.assertRaises(Cancelled):
+            self.repo.optimize(log=lambda *_: None)
+        report = self.repo.storage_report()[0]
+        self.assertGreater(report['exact'], 0)
+        self.repo.restore('OLD')
+        self.assertStagedEqual(inst)
 
 
 class RepackTest(RepoTest):

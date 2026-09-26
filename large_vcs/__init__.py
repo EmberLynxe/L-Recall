@@ -8,10 +8,11 @@ import shutil
 import signal
 import stat
 import threading
+from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from multiprocessing import Pool
 
-from .progress import step, track
+from .progress import Cancelled, check, step, track
 
 from .packs import PackStore, PackWriter
 
@@ -34,6 +35,18 @@ STUB_WAD = base64.b64decode(
     'Qj9nueOodSQvzrTQl4OoJz055+xE4HAtqObGaaMiL3bSbSikOVjRQdKlqh1QjrLjBS4Z5maZ6dhRN9tG7wAAAAA=')
 
 _pack_stores = {}
+
+
+@contextmanager
+def _pool(workers):
+    """thread pool that drops the queued work on cancel. plain with-block waits for every last task"""
+    executor = ThreadPoolExecutor(max_workers=workers)
+    try:
+        yield executor
+    except BaseException:
+        executor.shutdown(wait=True, cancel_futures=True)
+        raise
+    executor.shutdown(wait=True)
 _cost_cache = {}
 
 _locks = {}
@@ -510,10 +523,10 @@ class LargeVCS:
                 wad_files.sort(key=lambda w: os.path.getsize(w[0]), reverse=True)
                 print(f'Storing {len(wad_files)} WAD archives ({WORKERS} threads)...')
                 try:
-                    with ThreadPoolExecutor(max_workers=WORKERS) as executor:
+                    with _pool(WORKERS) as executor:
                         futures = {executor.submit(self._store_wad, fp, known, None, writer): rp
                                    for fp, rp in wad_files}
-                        for future in track(as_completed(futures), total=len(futures), label='Storing archives'):
+                        for future in track(as_completed(futures), total=len(futures), label=f'Storing patch {tag}'):
                             self._record(patch, dups, future.result(), futures[future])
                 finally:
                     writer.seal()
@@ -692,23 +705,23 @@ class LargeVCS:
             sizes = {h: self._wad_size(h) for h, _ in wads}
             wads.sort(key=lambda x: sizes[x[0]], reverse=True)
             total = sum(sizes.values())
-            print(f'Building {len(wads)} WAD archives, {total / 1024 ** 3:.1f} GB ({WORKERS} threads)...')
+            print(f'Building patch {tag}: {len(wads)} archives, {total / 1024 ** 3:.1f} GB ({WORKERS} threads)...')
             done = 0
-            step(0, total, 'Building archives')
-            with ThreadPoolExecutor(max_workers=WORKERS) as executor:
+            step(0, total, f'Building patch {tag}')
+            with _pool(WORKERS) as executor:
                 futures = {executor.submit(self._build_wad, cs, self.current_path(rp)): (cs, rp) for cs, rp in wads}
                 for future in as_completed(futures):
                     future.result()
                     cs, rp = futures[future]
                     stubs.discard(rp)
                     done += sizes[cs]
-                    step(done, total, 'Building archives')
+                    step(done, total, f'Building patch {tag}')
 
         self._save_stubs(stubs)
         _write_json_atomic(self.current_patch_path, tag)
         # keep_prepared counts the current one
         self._drop_kept(self.kept()[max(self.keep_prepared - 1, 0):])
-        print(f'Restored patch {tag}!')
+        print(f'Patch {tag} is ready.')
 
     def _link_from_kept(self, tag, wads, stubs):
         """identical archives in a kept patch get hard linked instead of rebuilt. returns what's left"""
@@ -766,9 +779,9 @@ class LargeVCS:
                 os.makedirs(os.path.dirname(dst), exist_ok=True)
                 load_from_repo(os.path.join(self.files_dir, checksum), dst)
 
-        with ThreadPoolExecutor(max_workers=WORKERS) as executor:
+        with _pool(WORKERS) as executor:
             futures = [executor.submit(_one, item) for item in items]
-            for future in track(as_completed(futures), total=len(futures), label='Exporting files'):
+            for future in track(as_completed(futures), total=len(futures), label=f'Exporting patch {tag}'):
                 future.result()
 
     # storage format stuff
@@ -1013,7 +1026,7 @@ class LargeVCS:
                 return checksum, os.path.getsize(path), None
             return checksum, toc, keys
 
-        with ThreadPoolExecutor(max_workers=WORKERS) as executor:
+        with _pool(WORKERS) as executor:
             for checksum, toc, keys in executor.map(_one, whole):
                 saved_from += os.path.getsize(os.path.join(self.files_dir, checksum))
                 after += toc
@@ -1088,27 +1101,34 @@ class LargeVCS:
                                             self.files_dir, known, expected_sha=checksum, writer=writer)
                 return _store_manifest(self.files_dir, manifest) if manifest else None
 
-            with ThreadPoolExecutor(max_workers=WORKERS) as executor:
-                futures = {executor.submit(convert, c): c for c in order}
-                for i, future in enumerate(as_completed(futures), 1):
-                    checksum = futures[future]
-                    try:
-                        manifest_hash = future.result()
-                    except Exception as e:
-                        manifest_hash = None
-                        log(f'  kept {whole[checksum]} unchanged ({e})')
-                    if manifest_hash:
-                        pending[checksum] = manifest_hash
-                        pending_bytes += sizes[checksum]
-                    else:
-                        kept += 1
-                    done_bytes += sizes[checksum]
-                    # by bytes, not count. the big archives take forever and the bar should show it
-                    step(done_bytes, total, 'Converting archives')
-                    if i % 25 == 0 or i == len(order):
-                        log(f'  {i}/{len(order)} archives, {100 * done_bytes / total:.0f}%')
-                    if pending_bytes >= COMMIT_BYTES:
-                        commit()
+            try:
+                with _pool(WORKERS) as executor:
+                    futures = {executor.submit(convert, c): c for c in order}
+                    for i, future in enumerate(as_completed(futures), 1):
+                        checksum = futures[future]
+                        try:
+                            manifest_hash = future.result()
+                        except Exception as e:
+                            manifest_hash = None
+                            log(f'  kept {whole[checksum]} unchanged ({e})')
+                        if manifest_hash:
+                            pending[checksum] = manifest_hash
+                            pending_bytes += sizes[checksum]
+                        else:
+                            kept += 1
+                        done_bytes += sizes[checksum]
+                        # by bytes, not count. the big archives take forever and the bar should show it
+                        step(done_bytes, total, 'Converting archives')
+                        if i % 25 == 0 or i == len(order):
+                            log(f'  {i}/{len(order)} archives, {100 * done_bytes / total:.0f}%')
+                        if pending_bytes >= COMMIT_BYTES:
+                            commit()
+            except Cancelled:
+                # everything converted so far is already checked against its original, keep it
+                commit()
+                writer.seal()
+                log('Stopped. Everything converted so far is kept, run Optimize again to do the rest.')
+                raise
             commit()
             writer.seal()
 

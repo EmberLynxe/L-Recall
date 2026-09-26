@@ -16,7 +16,7 @@ import wx.html2
 from ..icons import icon
 from ..utils.frame import CallbackFrame
 from ..utils.output import capture
-from large_vcs.progress import reporting
+from large_vcs.progress import Cancelled, reporting
 
 from ... import __version__, assets, core, selfupdate, uninstall, updates, vanguard, winproc
 from ...config import Config
@@ -63,6 +63,9 @@ class SettingsFrame(CallbackFrame):
         self._notify = notify
         self._icons_done = frozenset()
         self._icons_lock = threading.Lock()
+        self._busy = False
+        self._cancel = None
+        self.Bind(wx.EVT_CLOSE, self._on_close)
         self._quit_app = quit_app
         self._replays = []
         self.notes = Notes(os.path.join(os.path.dirname(config._path), 'replay_notes.json'))
@@ -148,13 +151,14 @@ class SettingsFrame(CallbackFrame):
         js = f'window.__console_progress({int(done)}, {int(total)}, {json.dumps(label)})'
         wx.CallAfter(self._run_js, js)
 
-    def _console_done(self, ok=True):
-        wx.CallAfter(self._run_js, f'window.__console_done({json.dumps(ok)})')
+    def _console_done(self, status='ok'):
+        wx.CallAfter(self._run_js, f'window.__console_done({json.dumps(status)})')
 
     def _handle_notify(self, req_id, msg):
         """page finished something while you weren't looking. tray popup + flash the taskbar"""
         title = str(msg.get('title', ''))[:60]
-        text = 'Finished.' if msg.get('ok') else "Didn't finish. Open L-Recall to see why."
+        text = {'ok': 'Finished.', 'cancelled': 'Cancelled.'}.get(msg.get('status'),
+                                                                   "Didn't finish. Open L-Recall to see why.")
         if self._notify:
             self._notify(title, text)
         wx.CallAfter(self.RequestUserAttention)
@@ -260,6 +264,8 @@ class SettingsFrame(CallbackFrame):
         def run():
             try:
                 assets.download_for_replays(replays, log=lambda *_: None)
+                if not self._icons_done:
+                    assets.share_duplicates()  # once per run, catches copies from before sharing existed
                 self._icons_done |= patches
             except Exception:
                 pass
@@ -643,21 +649,63 @@ class SettingsFrame(CallbackFrame):
 
     def _run_console_op_inner(self, req_id, func, *args):
         output = _ConsoleWriter(self._push_console)
-        ok = True
-        with capture(output), reporting(self._push_progress):
+        self._cancel = threading.Event()
+        self._busy = True
+        status = 'ok'
+        with capture(output), reporting(self._push_progress, self._cancel):
             try:
                 func(*args)
+            except Cancelled:
+                status = 'cancelled'
+                print('Cancelled.')
             except Exception as e:
-                ok = False
+                status = 'failed'
                 known = (UserInputException, ValueError, AssertionError)
                 print(str(e) if isinstance(e, known) else traceback.format_exc())
-        self._console_done(ok)
+        self._busy = False
+        self._console_done(status)
         self._respond(req_id, True)
+        wx.CallAfter(self._close_if_hidden)
+
+    def busy(self):
+        return self._busy
+
+    def cancel_op(self):
+        if self._cancel:
+            self._cancel.set()
+
+    def _handle_cancel_op(self, req_id, _msg):
+        self.cancel_op()
+        self._respond(req_id, True)
+
+    def _on_close(self, evt):
+        # closing mid-job used to destroy the window with the job still running into it. now it just
+        # hides, the job carries on, and opening l-recall again shows it
+        if self._busy and evt.CanVeto():
+            evt.Veto()
+            self.Hide()
+            return
+        evt.Skip()
+
+    def _close_if_hidden(self):
+        # got hidden mid-job and the job's done. give the page a few seconds to send its popup, then go
+        def go():
+            try:
+                if not self.IsShown() and not self._busy:
+                    self.Destroy()
+            except RuntimeError:
+                pass
+        try:
+            if not self.IsShown():
+                wx.CallLater(4000, go)
+        except RuntimeError:
+            pass
 
     def _do_watch(self, path):
         core.set_repo_path(self.config['repository'])
         print(f'Loading replay: {path}')
-        core.watch(path)
+        # once the game's starting there's nothing left to cancel
+        core.watch(path, before_launch=lambda: wx.CallAfter(self._run_js, 'window.__console_cancellable(false)'))
         print('Replay finished.')
 
     def _do_add_patch(self, path):

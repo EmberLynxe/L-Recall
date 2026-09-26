@@ -6,7 +6,7 @@ import subprocess
 import time
 from typing import Optional
 
-from large_vcs import LargeVCS
+from large_vcs import LargeVCS, progress
 
 from league_vcs import signing, winproc
 from league_vcs.exceptions import UserInputException
@@ -213,7 +213,7 @@ def vanguard_preflight(version, warn_old=True):
     return None, None
 
 
-def watch(replay):
+def watch(replay, before_launch=None):
     rofl = ROFLParser(replay)
     game_version = rofl.version
     if game_version not in repo.list():
@@ -232,7 +232,10 @@ def watch(replay):
     if problem:
         raise UserInputException(f'Not launching patch {game_version}: {problem} '
                                  'The stored copy might be damaged, or it didn\'t come from Riot.')
-    print('Launching replay...')
+    progress.check()
+    if before_launch:
+        before_launch()
+    print(f'Launching replay on patch {game_version}...')
     # launch it the same way the riot client does. never touch the game process
     p = subprocess.Popen([game_path, replay], cwd=os.path.dirname(game_path))
     p.wait()

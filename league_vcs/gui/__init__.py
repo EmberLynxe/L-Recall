@@ -134,7 +134,7 @@ class GUI:
             scan_option,
             None,
             ('Settings', self.open_settings),
-            ('Exit', self.exit)
+            ('Exit', self.ask_exit)
         )
         self.tray_icon.menu_options = tray_menu
 
@@ -169,6 +169,33 @@ class GUI:
             self.open_settings()
         else:
             webbrowser.open(self.update_info['url'] if self.update_info else updates.RELEASES_URL)
+
+    def ask_exit(self, *_):
+        """exit from the tray. if something's still running, ask, then stop it properly first"""
+        frame = self.settings_frame
+        try:
+            busy = bool(frame and frame.busy())
+        except RuntimeError:
+            busy = False
+        if not busy:
+            return self.exit()
+        answer = wx.MessageBox('L-Recall is still working on something. Stop it and quit?\n\n'
+                               'Stopping is safe, anything half done gets tidied up next time.',
+                               'L-Recall', wx.YES_NO | wx.NO_DEFAULT | wx.ICON_QUESTION)
+        if answer != wx.YES:
+            return
+        frame.cancel_op()
+
+        def wait(tries=40):
+            try:
+                still = frame.busy()
+            except RuntimeError:
+                still = False
+            if still and tries:
+                wx.CallLater(250, wait, tries - 1)
+            else:
+                self.exit()
+        wait()
 
     def exit(self, *_):
         if self.tray_icon:
