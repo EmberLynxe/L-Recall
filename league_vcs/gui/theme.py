@@ -9,7 +9,7 @@ TEXT = '#cdd6f4'
 TEXT_DIM = '#6c7086'
 TEXT_BRIGHT = '#f0e6d2'
 
-ACCENT = '#c8aa6e'
+ACCENT = '#f0883e'
 ACCENT_HOVER = '#e0c585'
 
 GREEN = '#a6e3a1'
