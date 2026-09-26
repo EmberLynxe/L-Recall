@@ -287,6 +287,18 @@ def champion_names(version):
     return list(_catalog(version, 'champion')['data'])
 
 
+def champion_display_names(version):
+    """id -> the name people actually know (MonkeyKing -> Wukong). only what's already on disk,
+    the page has its own list for when this is empty"""
+    try:
+        _safe(version)
+        with open(os.path.join(ROOT, version, 'champion.json'), 'rb') as f:
+            data = json.loads(f.read())['data']
+        return {k.lower(): v['name'] for k, v in data.items() if v.get('name') and v['name'] != k}
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return {}
+
+
 def _vkey(v):
     return [int(x) if x.isdigit() else 0 for x in v.split('.')]
 

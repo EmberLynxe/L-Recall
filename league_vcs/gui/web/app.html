@@ -720,6 +720,13 @@ const CHAMP_FIX = { Wukong: 'MonkeyKing', FiddleSticks: 'Fiddlesticks' };
 const SPELLS = {1:'SummonerBoost',3:'SummonerExhaust',4:'SummonerFlash',6:'SummonerHaste',7:'SummonerHeal',11:'SummonerSmite',12:'SummonerTeleport',13:'SummonerMana',14:'SummonerDot',21:'SummonerBarrier',32:'SummonerSnowball'};
 let assetBase = '', ddVersions = [];
 const ckey = c => CHAMP_FIX[c] || c;
+// replays use the internal name. data dragon's list replaces this once it's on disk
+let champNames = { monkeyking: 'Wukong', aurelionsol: 'Aurelion Sol', belveth: "Bel'Veth", chogath: "Cho'Gath",
+  drmundo: 'Dr. Mundo', jarvaniv: 'Jarvan IV', kaisa: "Kai'Sa", khazix: "Kha'Zix", kogmaw: "Kog'Maw", ksante: "K'Sante",
+  leblanc: 'LeBlanc', leesin: 'Lee Sin', masteryi: 'Master Yi', missfortune: 'Miss Fortune', nunu: 'Nunu & Willump',
+  reksai: "Rek'Sai", renata: 'Renata Glasc', tahmkench: 'Tahm Kench', twistedfate: 'Twisted Fate', velkoz: "Vel'Koz",
+  xinzhao: 'Xin Zhao', fiddlesticks: 'Fiddlesticks' };
+const cname = c => champNames[(c || '').toLowerCase()] || c;
 function verFor(patch) { return ddVersions.find(v => v === patch || v.startsWith(patch + '.')) || ddVersions[0] || ''; }
 const latest = () => ddVersions[0] || '';
 // on disk first. an older patch that isn't cached yet borrows the newest cached icon, which is
@@ -739,7 +746,7 @@ function imgFail(el) {
   else el.remove();
 }
 function champIcon(c, ver) {
-  return '<span class="ci" data-n="' + esc((c || '?').slice(0, 2)) + '" title="' + esc(c) + '">' + imgTag('champion', ckey(c), ver || latest()) + '</span>';
+  return '<span class="ci" data-n="' + esc((c || '?').slice(0, 2)) + '" title="' + esc(cname(c)) + '">' + imgTag('champion', ckey(c), ver || latest()) + '</span>';
 }
 
 // league of graphs
@@ -791,6 +798,7 @@ async function showApp() {
   try {
     const a = await call('get_assets');
     assetBase = a.base || ''; ddVersions = a.versions || [];
+    Object.assign(champNames, a.champions || {});
   } catch (e) {
     try { ddVersions = (await (await fetch('https://ddragon.leagueoflegends.com/api/versions.json')).json()).filter(v => /^\d/.test(v)); } catch (e2) {}
   }
@@ -896,7 +904,7 @@ function matchesQuery(r, q) {
   if (q.startsWith('#')) return tags.some(t => t.startsWith(q.slice(1)));
   return r.filename.toLowerCase().includes(q) || r.patch.includes(q) ||
     tags.some(t => t.includes(q)) || (r.note || '').toLowerCase().includes(q) ||
-    r.players.some(p => p.c.toLowerCase().includes(q) || (p.n || '').toLowerCase().includes(q));
+    r.players.some(p => p.c.toLowerCase().includes(q) || cname(p.c).toLowerCase().includes(q) || (p.n || '').toLowerCase().includes(q));
 }
 const tagsInline = r => (r.tags && r.tags.length) ? ' <span class="rtags">' + r.tags.slice(0, 3).map(t => '#' + esc(t)).join(' ') + '</span>' : '';
 function filterR() {
@@ -1111,7 +1119,7 @@ function headHTML(r, d) {
   const mi = matchInfo(r.filename);
   let title, line2 = '';
   if (me) {
-    title = '<span class="res">' + (me.win ? 'Victory' : 'Defeat') + '</span><span class="nm">' + esc(me.c) + '</span>';
+    title = '<span class="res">' + (me.win ? 'Victory' : 'Defeat') + '</span><span class="nm">' + esc(cname(me.c)) + '</span>';
     line2 = '<span><b>' + me.k + ' / ' + me.d + ' / ' + me.a + '</b></span><span>' + ratio(me.k, me.d, me.a) + (me.d ? ' KDA' : '') + '</span>';
     if (full) { const mins = r.length / 60; line2 += '<span><b>' + full.cs + '</b> CS' + (mins ? ' (' + (full.cs / mins).toFixed(1) + '/min)' : '') + '</span>'; }
   } else {
@@ -1164,7 +1172,7 @@ function boardHTML(r, d) {
       h += '<tr' + (isMe(p) ? ' class="me"' : '') + ' onclick="selPlayer(' + cur.all.indexOf(p) + ')" title="Show runes and full stats">' +
         '<td><div class="pl"><div class="champ">' + champIcon(p.champion, ver) + (p.level ? '<span class="lvl">' + p.level + '</span>' : '') + '</div>' +
           '<div class="spells">' + sp + '</div>' + runes +
-          '<div class="pl-t"><div class="pl-c">' + esc(p.champion) + '</div><div class="pl-n" title="' + esc(name) + '">' + esc(name) + '</div></div></div></td>' +
+          '<div class="pl-t"><div class="pl-c">' + esc(cname(p.champion)) + '</div><div class="pl-n" title="' + esc(name) + '">' + esc(name) + '</div></div></div></td>' +
         '<td class="c-kda"><div class="kda">' + p.kills + '<i>/</i><span class="d">' + p.deaths + '</span><i>/</i>' + p.assists + '</div><div class="sub">' + ratio(p.kills, p.deaths, p.assists) + '</div></td>' +
         '<td class="c-dmg">' + (p.damage_dealt || 0).toLocaleString() + '<div class="bar"><i style="width:' + (100 * (p.damage_dealt || 0) / maxDmg).toFixed(1) + '%"></i></div></td>' +
         '<td class="c-gold n">' + fmtK(p.gold) + '</td>' +
@@ -1209,7 +1217,7 @@ function breakdownHTML() {
       const bar = parts
         ? parts.map(([pf, cls]) => '<i class="' + cls + '" style="width:' + (100 * pf(p) / max).toFixed(2) + '%"></i>').join('')
         : '<i class="' + (ti ? 'tb' : 'ta') + '" style="width:' + (100 * fn(p) / max).toFixed(2) + '%"></i>';
-      rows += '<div class="crow' + (ti && !j ? ' gap' : '') + (isMe(p) ? ' me' : '') + '" title="' + esc(p.champion + (p.name ? ' · ' + p.name : '')) + '">' +
+      rows += '<div class="crow' + (ti && !j ? ' gap' : '') + (isMe(p) ? ' me' : '') + '" title="' + esc(cname(p.champion) + (p.name ? ' · ' + p.name : '')) + '">' +
         champIcon(p.champion, ver) + '<div class="cbar">' + bar + '</div><span class="v">' + fmt(fn(p)) + '</span></div>';
     }));
     return '<div class="chart"><h4>' + title + '<span>' + (sub || '') + '</span></h4>' + rows + '</div>';
@@ -1326,7 +1334,7 @@ function playerHTML() {
   ];
   const groups = G.map(([title, rows]) =>
     '<div class="card"><h4>' + title + '</h4>' +
-      '<div class="srow hd"><span></span><span>' + esc(p.champion) + '</span><span>' + (opp ? esc(opp.champion) : '') + '</span></div>' +
+      '<div class="srow hd"><span></span><span>' + esc(cname(p.champion)) + '</span><span>' + (opp ? esc(cname(opp.champion)) : '') + '</span></div>' +
       rows.map(([label, f, fmt, dir]) => {
         const v = f(p), o = opp ? f(opp) : null;
         let cls = '';
@@ -1337,8 +1345,8 @@ function playerHTML() {
   const name = p.name ? (p.tag ? p.name + '#' + p.tag : p.name) : '';
   const head = '<div class="card" style="margin-bottom:12px;display:flex;align-items:center;gap:12px">' +
     '<div class="champ">' + champIcon(p.champion, ver).replace('class="ci"', 'class="ci" style="width:44px;height:44px"') + '</div>' +
-    '<div style="min-width:0"><div style="font-size:15px;font-weight:600;color:var(--t1)">' + esc(p.champion) + ' <span style="font-weight:400;color:var(--t3);font-size:12.5px">' + esc(POS[p.position] || '') + '</span></div>' +
-    '<div class="sub" style="font-size:12.5px">' + esc(name) + (opp ? ' · compared with ' + esc(opp.champion) + ' (lane opponent)' : ' · no lane opponent found') + '</div></div>' +
+    '<div style="min-width:0"><div style="font-size:15px;font-weight:600;color:var(--t1)">' + esc(cname(p.champion)) + ' <span style="font-weight:400;color:var(--t3);font-size:12.5px">' + esc(POS[p.position] || '') + '</span></div>' +
+    '<div class="sub" style="font-size:12.5px">' + esc(name) + (opp ? ' · compared with ' + esc(cname(opp.champion)) + ' (lane opponent)' : ' · no lane opponent found') + '</div></div>' +
     '<div style="margin-left:auto;text-align:right"><div class="kda">' + p.kills + '<i>/</i><span class="d">' + p.deaths + '</span><i>/</i>' + p.assists + '</div>' +
     '<div class="sub">' + ratio(p.kills, p.deaths, p.assists) + ' KDA</div></div></div>';
   return strip + head + '<div class="pgrid">' + runesCard + '<div class="sgroups">' + groups + '</div></div>';

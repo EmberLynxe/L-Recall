@@ -467,6 +467,7 @@ class SettingsFrame(CallbackFrame):
         self._respond(req_id, {
             'base': _file_url(assets.ROOT) + '/',
             'versions': vs[:400],
+            'champions': assets.champion_display_names(vs[0]) if vs else {},
         })
 
     def _handle_check_update(self, req_id, msg):
