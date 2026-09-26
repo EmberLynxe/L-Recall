@@ -1,22 +1,24 @@
 import wx
 
-BG = '#1e1e2e'
-BG_SURFACE = '#282838'
-BG_ELEVATED = '#333345'
-BG_INPUT = '#1b1b2b'
+# same colours as the web page (app.html :root), so the native bits don't look like a different app
+BG = '#0b0f14'
+BG_SURFACE = '#11161d'
+BG_ELEVATED = '#1d2631'
+BG_INPUT = '#0b0f14'
+LINE = '#1c242e'
 
-TEXT = '#cdd6f4'
-TEXT_DIM = '#6c7086'
-TEXT_BRIGHT = '#f0e6d2'
+TEXT = '#a3abb5'
+TEXT_DIM = '#8a94a0'
+TEXT_BRIGHT = '#e6e8eb'
 
 ACCENT = '#f0883e'
-ACCENT_HOVER = '#e0c585'
+ACCENT_HOVER = '#f59d5c'
 
-GREEN = '#a6e3a1'
-RED = '#f38ba8'
-YELLOW = '#f9e2af'
+GREEN = '#4caf7a'
+RED = '#ef6670'
+YELLOW = '#f2a93b'
 
-BORDER = '#45475a'
+BORDER = '#29333f'
 
 
 def apply(window):
@@ -52,7 +54,7 @@ def style_list(ctrl):
 def style_button(btn, accent=False):
     if accent:
         btn.SetBackgroundColour(ACCENT)
-        btn.SetForegroundColour('#1e1e2e')
+        btn.SetForegroundColour(BG)
     else:
         btn.SetBackgroundColour(BG_ELEVATED)
         btn.SetForegroundColour(TEXT)
