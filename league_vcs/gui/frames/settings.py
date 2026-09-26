@@ -211,6 +211,7 @@ class SettingsFrame(CallbackFrame):
             'player_names': self.config.get('player_names', []),
             'auto_download_assets': self.config.get('auto_download_assets', True),
             'keep_prepared': self.config.get('keep_prepared', 2),
+            'use_my_settings': self.config.get('use_my_settings', True),
             'quick_start': self.config.get('quick_start', False),
         })
 
@@ -574,6 +575,8 @@ class SettingsFrame(CallbackFrame):
             core.keep_prepared = self.config['keep_prepared'] = max(1, min(4, int(msg['keep'])))
             if core.repo:
                 core.repo.keep_prepared = core.keep_prepared
+        if 'settings' in msg:
+            core.use_my_settings = self.config['use_my_settings'] = bool(msg['settings'])
         self.config.save()
         self._respond(req_id, True)
 

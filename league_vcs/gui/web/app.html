@@ -529,6 +529,8 @@ tr.me .pl-n { color: var(--accent); }
               <option value="1">Keep 1 patch ready</option><option value="2">Keep 2 patches ready</option>
               <option value="3">Keep 3 patches ready</option><option value="4">Keep 4 patches ready</option></select></div>
             <div class="hint">Recently used patches stay ready, so going back to one starts straight away. Each one ready uses about 25 to 30 GB.</div>
+            <label class="check"><input type="checkbox" id="my-settings" onchange="setReplayStart({ settings: this.checked })"> Use my League settings in replays</label>
+            <div class="hint">Your graphics, camera and hotkeys, copied from your League install each time a replay starts, instead of the game's defaults.</div>
           </div>
         </div>
         <div class="frow">
@@ -1572,6 +1574,7 @@ async function loadSettings() {
   selFI = selGI = -1; $('rm-fl-btn').disabled = $('rm-gp-btn').disabled = true;
   $('dd-auto').checked = config.auto_download_assets !== false;
   $('keep-sel').value = String(config.keep_prepared || 2);
+  $('my-settings').checked = config.use_my_settings !== false;
   loadCacheInfo();
   loadVanguard();
   loadUpdateInfo();
@@ -1649,7 +1652,11 @@ async function repackStorage() {
   openCon('Rearranging storage');
   await call('repack_storage');
 }
-async function setReplayStart(opts) { await call('set_replay_start', opts); config.keep_prepared = opts.keep; }
+async function setReplayStart(opts) {
+  await call('set_replay_start', opts);
+  if (opts.keep) config.keep_prepared = opts.keep;
+  if ('settings' in opts) config.use_my_settings = opts.settings;
+}
 async function vgWarn(on) { await call('set_vanguard_warn', { on }); }
 async function loadCacheInfo() {
   try {

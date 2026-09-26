@@ -131,6 +131,35 @@ class DetectTest(TempDirTest):
         self.assertIsInstance(core.detect_game_exes(), list)
 
 
+class MySettingsTest(TempDirTest):
+    def test_settings_come_along_without_touching_the_real_ones(self):
+        league = os.path.join(self.tmp, 'League of Legends')
+        os.makedirs(os.path.join(league, 'Game'))
+        os.makedirs(os.path.join(league, 'Config'))
+        exe = os.path.join(league, 'Game', 'League of Legends.exe')
+        open(exe, 'wb').close()
+        for name, text in (('game.cfg', '[General]\nWidth=2560\n'), ('input.ini', '[GameEvents]\n'),
+                           ('PersistedSettings.json', '{"files": []}')):
+            with open(os.path.join(league, 'Config', name), 'w') as f:
+                f.write(text)
+        persisted = os.path.join(league, 'Config', 'PersistedSettings.json')
+        os.chmod(persisted, 0o444)  # people lock it so the client stops resetting it
+        game = os.path.join(self.tmp, 'current')
+        try:
+            with mock.patch.object(core, 'game_exes', [exe]), mock.patch.object(core, 'detect_game_exes', return_value=[]):
+                self.assertEqual(core.copy_settings(game), 3)
+                self.assertEqual(core.copy_settings(game), 3)  # again, over last time's copies
+            with open(os.path.join(game, 'Config', 'game.cfg')) as f:
+                self.assertIn('Width=2560', f.read())
+            self.assertFalse(os.stat(persisted).st_mode & 0o200)  # the real one's still locked
+        finally:
+            os.chmod(persisted, 0o666)
+
+    def test_no_league_install_means_defaults(self):
+        with mock.patch.object(core, 'game_exes', []), mock.patch.object(core, 'detect_game_exes', return_value=[]):
+            self.assertEqual(core.copy_settings(os.path.join(self.tmp, 'current')), 0)
+
+
 class ConfigTest(TempDirTest):
     def test_corrupt_config_is_set_aside(self):
         path = os.path.join(self.tmp, 'user_settings.json')

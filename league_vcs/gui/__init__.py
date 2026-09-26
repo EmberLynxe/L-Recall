@@ -49,6 +49,8 @@ class GUI:
     def __init__(self, config: Config):
         self.config = config
         core.keep_prepared = config.get('keep_prepared', 2)
+        core.use_my_settings = config.get('use_my_settings', True)
+        core.game_exes = config.get('game_paths') or []
         # quick start builds champion archives as empty placeholders. off until it's been tested properly
         core.quick_start = False
         self.app = wx.App()

@@ -23,6 +23,7 @@ class Config(dict):
         'check_updates': True,
         'dismissed_update': '',
         'keep_prepared': 2,
+        'use_my_settings': True,
         'quick_start': False,
     }
 

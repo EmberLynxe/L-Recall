@@ -2,6 +2,8 @@ import ctypes
 import json
 import os
 import re
+import shutil
+import stat
 import subprocess
 import time
 from typing import Optional
@@ -17,6 +19,8 @@ repo: Optional[LargeVCS] = None
 # settings the gui keeps in sync with the config
 keep_prepared = 2
 quick_start = False
+use_my_settings = True
+game_exes = []  # from the config, checked before auto detect
 
 
 def set_repo_path(path):
@@ -214,6 +218,36 @@ def vanguard_preflight(version, warn_old=True):
     return None, None
 
 
+# graphics, camera, hotkeys and everything else. the client keeps them synced to your account and
+# writes them here, next to the live game
+SETTINGS_FILES = ('game.cfg', 'input.ini', 'PersistedSettings.json')
+
+
+def copy_settings(game_folder):
+    """your league settings into the prepared game, so a replay doesn't open on defaults. only ever
+    reads the live install. the game looks in Config inside its own folder when started directly.
+    returns how many files it copied"""
+    for exe in list(game_exes) + detect_game_exes():
+        source = os.path.join(os.path.dirname(os.path.dirname(exe)), 'Config')
+        if os.path.isfile(os.path.join(source, 'game.cfg')):
+            break
+    else:
+        return 0
+    target = os.path.join(game_folder, 'Config')
+    os.makedirs(target, exist_ok=True)
+    copied = 0
+    for name in SETTINGS_FILES:
+        src, dst = os.path.join(source, name), os.path.join(target, name)
+        if not os.path.isfile(src):
+            continue
+        if os.path.exists(dst):
+            os.chmod(dst, stat.S_IWRITE)  # people make PersistedSettings read only to stop it resetting
+            os.unlink(dst)
+        shutil.copyfile(src, dst)  # not copy2, that'd carry the read only flag over
+        copied += 1
+    return copied
+
+
 def watch(replay, before_launch=None):
     rofl = ROFLParser(replay)
     game_version = rofl.version
@@ -233,6 +267,12 @@ def watch(replay, before_launch=None):
     if problem:
         raise UserInputException(f'Not launching patch {game_version}: {problem} '
                                  'The stored copy might be damaged, or it didn\'t come from Riot.')
+    if use_my_settings:
+        try:
+            if copy_settings(repo.current_path()):
+                print('Using your League settings.')
+        except OSError as e:
+            print(f"Couldn't copy your League settings ({e}), so the replay starts with the defaults.")
     progress.check()
     if before_launch:
         before_launch()
