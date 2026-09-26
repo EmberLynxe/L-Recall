@@ -56,10 +56,11 @@ def _same_url(a, b):
 
 
 class SettingsFrame(CallbackFrame):
-    def __init__(self, config: Config, quit_app=None):
+    def __init__(self, config: Config, quit_app=None, notify=None):
         super().__init__(None, title='L-Recall')
         self.SetBackgroundColour(wx.Colour(11, 15, 20))
         self.config = config
+        self._notify = notify
         self._quit_app = quit_app
         self._replays = []
         self.notes = Notes(os.path.join(os.path.dirname(config._path), 'replay_notes.json'))
@@ -145,8 +146,17 @@ class SettingsFrame(CallbackFrame):
         js = f'window.__console_progress({int(done)}, {int(total)}, {json.dumps(label)})'
         wx.CallAfter(self._run_js, js)
 
-    def _console_done(self):
-        wx.CallAfter(self._run_js, 'window.__console_done()')
+    def _console_done(self, ok=True):
+        wx.CallAfter(self._run_js, f'window.__console_done({json.dumps(ok)})')
+
+    def _handle_notify(self, req_id, msg):
+        """page finished something while you weren't looking. tray popup + flash the taskbar"""
+        title = str(msg.get('title', ''))[:60]
+        text = 'Finished.' if msg.get('ok') else "Didn't finish. Open L-Recall to see why."
+        if self._notify:
+            self._notify(title, text)
+        wx.CallAfter(self.RequestUserAttention)
+        self._respond(req_id, True)
 
     def _run_js(self, code):
         try:
@@ -267,8 +277,7 @@ class SettingsFrame(CallbackFrame):
     def _do_optimize(self):
         repo = self._repo_or_none()
         if repo is None:
-            print('Storage folder not found.')
-            return
+            raise UserInputException('Storage folder not found.')
         before = repo.total_size()
         repo.optimize()
         after = repo.total_size()
@@ -447,8 +456,7 @@ class SettingsFrame(CallbackFrame):
 
     def _do_update(self):
         if not selfupdate.can_update():
-            print('Running from source, so there\'s nothing to update in place.')
-            return
+            raise UserInputException('Running from source, so there\'s nothing to update in place.')
         release = updates.newer_than_running(force=True)
         if not release:
             print('Already on the newest version.')
@@ -525,11 +533,9 @@ class SettingsFrame(CallbackFrame):
     def _do_repack(self):
         repo = self._repo_or_none()
         if repo is None:
-            print('Storage folder not found.')
-            return
+            raise UserInputException('Storage folder not found.')
         if winproc.game_running():
-            print('League is running. Close the game (and any replay) first.')
-            return
+            raise UserInputException('League is running. Close the game (and any replay) first.')
         repo.repack()
 
     def _handle_set_replay_start(self, req_id, msg):
@@ -615,22 +621,22 @@ class SettingsFrame(CallbackFrame):
 
     def _run_console_op_inner(self, req_id, func, *args):
         output = _ConsoleWriter(self._push_console)
+        ok = True
         with capture(output), reporting(self._push_progress):
             try:
                 func(*args)
             except Exception as e:
-                print(str(e) if isinstance(e, (UserInputException, ValueError)) else traceback.format_exc())
-        self._console_done()
+                ok = False
+                known = (UserInputException, ValueError, AssertionError)
+                print(str(e) if isinstance(e, known) else traceback.format_exc())
+        self._console_done(ok)
         self._respond(req_id, True)
 
     def _do_watch(self, path):
         core.set_repo_path(self.config['repository'])
         print(f'Loading replay: {path}')
-        try:
-            core.watch(path)
-            print('Replay finished.')
-        except UserInputException as e:
-            print(str(e))
+        core.watch(path)
+        print('Replay finished.')
 
     def _do_add_patch(self, path):
         core.set_repo_path(self.config['repository'])
@@ -655,8 +661,7 @@ class SettingsFrame(CallbackFrame):
 
     def _do_uninstall(self, delete_patches):
         if winproc.game_running():
-            print('League is running. Close the game (and any replay) first.')
-            return
+            raise UserInputException('League is running. Close the game (and any replay) first.')
         uninstall.remove_data(self.config.get('repository'), delete_patches)
         app_dir = os.path.dirname(sys.executable if getattr(sys, 'frozen', False) else self.config._path)
         if uninstall.schedule_program_removal(app_dir):
@@ -680,8 +685,7 @@ class SettingsFrame(CallbackFrame):
     def _do_restore_patch(self, patch):
         core.set_repo_path(self.config['repository'])
         if winproc.game_running():
-            print('League is running. Close the game (and any replay) first.')
-            return
+            raise UserInputException('League is running. Close the game (and any replay) first.')
         self._known_patches([patch])
         if core.repo.current() == patch:
             print(f'Deselecting patch {patch}...')

@@ -26,6 +26,7 @@ from .frames import WatchReplayFrame, InitialConfigFrame, SettingsFrame
 from .tray_item import TrayItem
 from .. import core, updates, winproc
 from ..config import Config
+from ..exceptions import UserInputException
 
 
 class GUI:
@@ -157,6 +158,11 @@ class GUI:
                          title=f"L-Recall {release['version']} is out",
                          text='Open L-Recall and hit Update now.')
 
+    def notify(self, title, text):
+        """tray popup, any thread"""
+        if self.tray_icon:
+            wx.CallAfter(self.tray_icon.ShowBalloon, title=title, text=text)
+
     def open_update(self, *_):
         # the built app updates itself from the banner. from source there's nothing to swap, so the page
         if getattr(sys, 'frozen', False):
@@ -203,7 +209,7 @@ class GUI:
             return
 
         self.set_high_priority()
-        frame = self.settings_frame = SettingsFrame(self.config, quit_app=self.exit)
+        frame = self.settings_frame = SettingsFrame(self.config, quit_app=self.exit, notify=self.notify)
         frame.Show()
         frame.on_close(self._on_settings_closed)
 
@@ -271,8 +277,12 @@ class GUI:
             for game_path, version in to_update:
                 try:
                     core.add(os.path.dirname(game_path))
+                except UserInputException as e:
+                    print(f'Skipped {version}: {e}')  # still updating, or changed mid-copy. next scan retries
+                    continue
                 except Exception as e:
                     print(f'Skipped {version}: {e}')
+                    self.notify(f"Couldn't store patch {version}", 'Check the log in the logs folder for details.')
                     continue
                 wx.CallAfter(self.tray_icon.ShowBalloon,
                              title=f'Stored patch {version}',

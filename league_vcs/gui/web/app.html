@@ -380,6 +380,9 @@ tr.me .pl-n { color: var(--gold); }
 .pbar i { display: block; height: 100%; width: 0; background: var(--gold); transition: width .15s linear; }
 .modal-f { display: flex; align-items: center; gap: 10px; padding: 12px 16px; }
 .modal-f .working { margin-right: auto; font-size: 12px; color: var(--t3); }
+.modal-f .working.ok { color: #4caf7a; font-weight: 600; }
+.modal-f .working.bad { color: var(--loss); font-weight: 600; }
+.modal-prog.bad .pbar i { background: var(--loss); }
 .cfm { width: 400px; background: var(--panel); border: 1px solid var(--line2); border-radius: 4px; padding: 18px; box-shadow: 0 16px 48px rgba(0,0,0,.5); }
 .cfm p { font-size: 13px; color: var(--t1); line-height: 1.55; margin-bottom: 16px; }
 .cfm .acts { justify-content: flex-end; }
@@ -641,7 +644,16 @@ window.__console_progress = (done, total, label) => {
   $('con-plabel').textContent = label || 'Working';
   $('con-pnum').textContent = (total > 1e6 ? Math.floor(pct) + '%' : done.toLocaleString() + ' / ' + total.toLocaleString()) + eta;
 };
-window.__console_done = () => { $('con-close').style.display = ''; $('con-sp').style.display = 'none'; };
+// say it plainly when it's over. it used to just stop saying working and that was easy to miss
+window.__console_done = ok => {
+  ok = ok !== false;
+  $('con-close').style.display = '';
+  $('con-sp').textContent = ok ? '✓ Finished' : "Didn't finish, see above";
+  $('con-sp').className = 'working ' + (ok ? 'ok' : 'bad');
+  $('con-prog').classList.toggle('bad', !ok);
+  if (ok && $('con-prog').classList.contains('on')) { $('con-pfill').style.width = '100%'; $('con-pnum').textContent = 'Done'; }
+  if (_conNotify && (document.hidden || !document.hasFocus())) call('notify', { title: $('con-title').textContent, ok });
+};
 function send(action, args) {
   return new Promise(res => {
     const id = 'r' + (++_rid);
@@ -1306,7 +1318,7 @@ async function watchPath(r) {
     const pf = await call('replay_preflight', { path: r.path });
     if (pf.message && !await cfmDlg(pf.message, pf.level === 'block' ? 'Launch anyway' : 'Watch anyway', false)) return;
   } catch (e) {}
-  openCon('Starting replay');
+  openCon('Starting replay', false);
   await call('watch_replay', { path: r.path });
 }
 async function showFile(path) {
@@ -1566,7 +1578,7 @@ async function updInstall() {
   if (!updCanInstall) { updDownload(); return; }
   if (!await cfmDlg('Update to L-Recall ' + updInfo.version + '? It downloads the new version, closes, and opens again by itself. Settings and stored patches stay as they are.', 'Update', false)) return;
   $('upd').style.display = 'none';
-  openCon('Updating to ' + updInfo.version);
+  openCon('Updating to ' + updInfo.version, false);
   await call('install_update');
 }
 async function updLater() {
@@ -1624,7 +1636,7 @@ async function uninstallApp() {
     : 'Stored patches are kept, so a future install can pick them up again. ') +
     'Replay files aren\'t touched. L-Recall closes when it\'s done.';
   if (!await cfmDlg(msg, 'Uninstall')) return;
-  openCon('Uninstalling');
+  openCon('Uninstalling', false);
   await call('uninstall', { delete_patches: patches });
 }
 async function ddAuto(on) {
@@ -1675,12 +1687,17 @@ async function rmGP() {
 function openLink(url) { call('open_link', { url }); }
 
 // console / confirm
-function openCon(title) {
+let _conNotify = true;
+function openCon(title, notify = true) {
+  _conNotify = notify;
+  $('con-sp').textContent = 'Working...';
+  $('con-sp').className = 'working';
   $('con-title').textContent = title;
   $('con-out').textContent = '';
   $('con-prog').classList.remove('on');
   $('con-pfill').style.width = '0';
   _pg = null;
+  $('con-prog').classList.remove('bad');
   $('con-close').style.display = 'none';
   $('con-sp').style.display = '';
   $('con-ov').classList.add('on');
