@@ -132,7 +132,7 @@ class InstallChanged(UserInputException):
     pass
 
 
-def add(directory):
+def add(directory, workers=None):
     game_path = os.path.join(directory, GameParser.executable_name)
     version, is_new = can_update(game_path)
     if not is_new:
@@ -144,7 +144,7 @@ def add(directory):
 
     print(f'Adding patch {version} to repository.')
     print(f'This may take a while.')
-    repo.add(directory, version)
+    repo.add(directory, version, workers=workers)
 
     # the riot client can start patching while we're reading. if anything changed,
     # throw the copy away, a patch made of two versions won't play
@@ -237,8 +237,37 @@ def watch(replay, before_launch=None):
         before_launch()
     print(f'Launching replay on patch {game_version}...')
     # launch it the same way the riot client does. never touch the game process
-    p = subprocess.Popen([game_path, replay], cwd=os.path.dirname(game_path))
+    try:
+        p = subprocess.Popen([game_path, replay], cwd=os.path.dirname(game_path))
+    except PermissionError:
+        raise UserInputException(launch_refused(game_version)) from None
     p.wait()
+
+
+def launch_refused(version):
+    """windows said no to starting the game. with vanguard loaded from boot that's vanguard
+    refusing a copy the riot client didn't start. we don't try to get past that, ever"""
+    from league_vcs import vanguard
+    st = vanguard.status()
+    if not st['running']:
+        return (f'Windows wouldn\'t start patch {version} (access denied). Antivirus is the usual '
+                'suspect, check whether it blocked League of Legends.exe in the storage folder.')
+    msg = (f'Windows wouldn\'t start patch {version}. Riot Vanguard is running and blocked it, '
+           'which it does to game copies the Riot Client didn\'t start. L-Recall won\'t try to get around that.')
+    live = detect_game_exe()
+    try:
+        live_version = GameParser(live).version if live else None
+    except Exception:
+        live_version = None
+    if live_version == version:
+        return msg + ' This replay is on the patch you have installed, so open it from the League client instead.'
+    if not needs_vanguard(version):
+        return msg + (' This patch is from before Vanguard, so you can exit Vanguard from its tray icon '
+                      '(it comes back when you restart your PC) and try again.')
+    if st['mode'] == 'boot':
+        return msg + (' Vanguard is set to start with Windows on this PC. Replays on 14.9 and newer only play '
+                      'here when Vanguard is in Pre-Check mode, where it starts with a Riot game instead.')
+    return msg
 
 
 def list_replays(folders):

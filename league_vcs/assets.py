@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import threading
+import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -24,6 +25,8 @@ if os.path.isdir(_OLD_ROOT) and not os.path.exists(ROOT):
 
 _lock = threading.Lock()
 _versions = None
+_failed_at = 0
+RETRY_AFTER = 5 * 60
 
 
 def _get(url, timeout=15):
@@ -47,6 +50,8 @@ def versions():
     with _lock:
         if _versions is not None:
             return _versions
+        if time.time() - _failed_at < RETRY_AFTER:
+            return []
         try:
             with open(os.path.join(ROOT, 'versions.json')) as f:
                 saved = json.load(f)
@@ -60,12 +65,14 @@ def versions():
 
 
 def _fetch_versions():
-    global _versions
+    global _versions, _failed_at
     try:
         found = [v for v in json.loads(_get(CDN + '/api/versions.json')) if v[:1].isdigit()]
         _save(os.path.join(ROOT, 'versions.json'), json.dumps(found).encode())
     except Exception:
         with _lock:
+            # offline. without this every icon lookup sat through the timeout again
+            _failed_at = time.time()
             return _versions or []
     with _lock:
         _versions = found

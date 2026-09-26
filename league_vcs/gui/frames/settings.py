@@ -628,7 +628,7 @@ class SettingsFrame(CallbackFrame):
             if dlg.ShowModal() != wx.ID_OK:
                 dlg.Destroy()
                 self._respond(req_id, True)
-                self._console_done()
+                self._console_done('cancelled')
                 return
             dest = dlg.GetPath()
             dlg.Destroy()
@@ -666,6 +666,7 @@ class SettingsFrame(CallbackFrame):
         self._console_done(status)
         self._respond(req_id, True)
         wx.CallAfter(self._close_if_hidden)
+        winproc.trim_memory()
 
     def busy(self):
         return self._busy
@@ -705,8 +706,13 @@ class SettingsFrame(CallbackFrame):
         core.set_repo_path(self.config['repository'])
         print(f'Loading replay: {path}')
         # once the game's starting there's nothing left to cancel
-        core.watch(path, before_launch=lambda: wx.CallAfter(self._run_js, 'window.__console_cancellable(false)'))
+        core.watch(path, before_launch=self._game_launching)
         print('Replay finished.')
+
+    def _game_launching(self):
+        # nothing's being written anymore, it's just waiting on the game. closing is fine now
+        self._busy = False
+        wx.CallAfter(self._run_js, 'window.__console_cancellable(false)')
 
     def _do_add_patch(self, path):
         core.set_repo_path(self.config['repository'])

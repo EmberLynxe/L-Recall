@@ -187,15 +187,20 @@ class PackStore:
 
     def compact(self, referenced, min_dead=0.3):
         """throw out blobs nobody uses. returns bytes freed"""
-        by_pack = {}
+        # every bundle on disk, not just the ones the index points at. a stopped repack leaves old
+        # bundles whose pieces all live somewhere newer, and those never show up in the index
+        by_pack = {name[:-4]: [] for name, _ in self._current_stamp()}
         for digest, (base, _, size) in self.index.items():
             by_pack.setdefault(base, []).append((digest, size))
         freed = 0
         for base, entries in track(list(by_pack.items()), label='Tidying bundles'):
             live = [d for d, _ in entries if d in referenced]
-            dead_bytes = sum(s for d, s in entries if d not in referenced)
-            total = sum(s for _, s in entries) or 1
-            if not dead_bytes or (live and dead_bytes / total < min_dead):
+            try:
+                total = os.path.getsize(os.path.join(self.dir, base + '.pack')) or 1
+            except OSError:
+                continue
+            dead_bytes = total - sum(s for d, s in entries if d in referenced)
+            if dead_bytes <= 0 or (live and dead_bytes / total < min_dead):
                 continue
             self.close(base)
             pack = os.path.join(self.dir, base + '.pack')

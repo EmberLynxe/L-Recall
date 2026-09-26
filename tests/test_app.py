@@ -194,6 +194,16 @@ class VanguardCheckTest(unittest.TestCase):
         self.assertFalse([n for n in dir(vanguard) if n.startswith(('set', 'stop', 'start', 'enable', 'disable'))])
         self.assertTrue(vanguard.status()['installed'] in (True, False, None))
 
+    def refused(self, version, live=None, **st):
+        with mock.patch.object(vanguard, 'status', return_value=self.status(**st)),                 mock.patch.object(core, 'detect_game_exe', return_value='x' if live else None),                 mock.patch.object(core, 'GameParser', return_value=mock.Mock(version=live)):
+            return core.launch_refused(version)
+
+    def test_blocked_launch_says_why(self):
+        self.assertIn('Pre-Check', self.refused('16.10.1', live='16.19.1'))
+        self.assertIn('League client', self.refused('16.19.1', live='16.19.1'))
+        self.assertIn('tray icon', self.refused('14.1.1'))
+        self.assertIn('Antivirus', self.refused('16.10.1', running=False))
+
     def test_old_patch_warns_only_when_asked(self):
         with mock.patch.object(vanguard, 'status', return_value=self.status(running=True)):
             self.assertEqual(core.vanguard_preflight('14.1.1')[0], 'warn')

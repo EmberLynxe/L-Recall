@@ -1,4 +1,5 @@
 import base64
+import functools
 import glob
 import hashlib
 import json
@@ -35,6 +36,24 @@ STUB_WAD = base64.b64decode(
     'Qj9nueOodSQvzrTQl4OoJz055+xE4HAtqObGaaMiL3bSbSikOVjRQdKlqh1QjrLjBS4Z5maZ6dhRN9tG7wAAAAA=')
 
 _pack_stores = {}
+
+
+_job_depth = threading.local()
+
+
+def _lets_go(fn):
+    """a job drops the bundle index when it's done. only the outermost one, optimize calling gc
+    shouldn't throw it away halfway and load it again"""
+    @functools.wraps(fn)
+    def wrapper(self, *args, **kwargs):
+        _job_depth.n = getattr(_job_depth, 'n', 0) + 1
+        try:
+            return fn(self, *args, **kwargs)
+        finally:
+            _job_depth.n -= 1
+            if not _job_depth.n:
+                self.release()
+    return wrapper
 
 
 @contextmanager
@@ -214,10 +233,48 @@ def _store_manifest(files_dir, manifest):
     return manifest_hash
 
 
+@functools.cache
+def _kernel32():
+    import ctypes
+    from ctypes import wintypes
+    k32 = ctypes.WinDLL('kernel32', use_last_error=True)
+    k32.CreateFileW.restype = wintypes.HANDLE
+    k32.CreateFileW.argtypes = (wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, wintypes.LPVOID,
+                                wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE)
+    k32.SetFileInformationByHandle.argtypes = (wintypes.HANDLE, ctypes.c_int, wintypes.LPVOID, wintypes.DWORD)
+    k32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    return k32
+
+
+def _delete_readonly(path):
+    """delete a read only file without clearing the flag first. prepared files are hard links to
+    the stored ones and share their attributes, so chmod here would make the stored copy writable
+    too. false if windows is too old for this (before 1809)"""
+    if os.name != 'nt':
+        return False
+    import ctypes
+    from ctypes import wintypes
+    k32 = _kernel32()
+    # DELETE access, share everything, OPEN_EXISTING, don't follow reparse points
+    handle = k32.CreateFileW(path, 0x10000, 7, None, 3, 0x00200000, None)
+    if handle == wintypes.HANDLE(-1).value:
+        err = ctypes.get_last_error()
+        if err in (2, 3):
+            raise FileNotFoundError(path)
+        raise ctypes.WinError(err)
+    try:
+        # FileDispositionInfoEx: delete | posix semantics | ignore readonly
+        flags = wintypes.DWORD(0x1 | 0x2 | 0x10)
+        return bool(k32.SetFileInformationByHandle(handle, 21, ctypes.byref(flags), 4))
+    finally:
+        k32.CloseHandle(handle)
+
+
 def _unlink_blob(path):
     try:
-        os.chmod(path, stat.S_IWRITE)
-        os.unlink(path)
+        if not _delete_readonly(path):
+            os.chmod(path, stat.S_IWRITE)
+            os.unlink(path)
     except FileNotFoundError:
         pass
 
@@ -304,6 +361,14 @@ class LargeVCS:
         else:
             store.reload()
         return store
+
+    def release(self):
+        """drop the bundle index. it's only needed mid-job and it's 100+ MB on a big storage folder,
+        so every job lets go of it at the end instead of it sitting in the tray forever"""
+        with self.lock:
+            store = _pack_stores.pop(self.files_dir, None)
+            if store is not None:
+                store.close()
 
     def _blob_size(self, digest, packs=None):
         packs = packs or self.packs
@@ -417,9 +482,12 @@ class LargeVCS:
             return False
         self._drop_kept([tag])
         os.makedirs(self.kept_path(), exist_ok=True)
+        # placeholder list and "nothing's prepared" go down before the move. dying halfway
+        # through otherwise leaves riot's empty archives looking like the real ones
+        self._save_stubs(self.stubs(), tag)
+        _write_json_atomic(self.current_patch_path, None)
         os.rename(self.current_path(), self.kept_path(tag))
         os.utime(self.kept_path(tag))
-        self._save_stubs(self.stubs(), tag)
         self._save_stubs(set())
         os.unlink(self.current_patch_path)
         return True
@@ -429,11 +497,12 @@ class LargeVCS:
             return False
         if os.path.exists(self.current_path()):
             self._clean()
-        os.rename(self.kept_path(tag), self.current_path())
+        # same deal, stubs first. current.json only says tag once the folder's actually there
         self._save_stubs(self.stubs(tag))
-        self._save_stubs(set(), tag)
+        os.rename(self.kept_path(tag), self.current_path())
         # it was complete when it got parked
         _write_json_atomic(self.current_patch_path, tag)
+        self._save_stubs(set(), tag)
         return True
 
     def _wad_size(self, checksum):
@@ -476,8 +545,10 @@ class LargeVCS:
         save_to_repo(full_path, os.path.join(self.files_dir, checksum))
         return checksum
 
-    def add(self, target, tag):
+    @_lets_go
+    def add(self, target, tag, workers=None):
         self.ensure_repo()
+        workers = workers or WORKERS
         with self.lock:
             patch_path = self._patch_path(tag)
             assert not os.path.exists(patch_path), f'Patch {tag} already exists!'
@@ -494,7 +565,7 @@ class LargeVCS:
             patch, dups = {}, {}
 
             if regular_files:
-                pool = Pool(WORKERS, initializer=initializer)
+                pool = Pool(workers, initializer=initializer)
                 try:
                     print('Hashing regular files...')
                     with_hash = list(track(pool.imap_unordered(self._hash_file, regular_files),
@@ -508,7 +579,7 @@ class LargeVCS:
                     if to_add:
                         print(f'Storing {len(to_add)} new regular files...')
                         list(track(pool.imap_unordered(self._add_file, to_add), total=len(to_add), label='Storing files'))
-                except KeyboardInterrupt:
+                except BaseException:  # cancelled or ctrl+c, either way the workers stop now
                     pool.terminate()
                     pool.join()
                     raise
@@ -521,9 +592,9 @@ class LargeVCS:
                 known = self._known_blobs()
                 writer = PackWriter(self.packs)
                 wad_files.sort(key=lambda w: os.path.getsize(w[0]), reverse=True)
-                print(f'Storing {len(wad_files)} WAD archives ({WORKERS} threads)...')
+                print(f'Storing {len(wad_files)} WAD archives ({workers} threads)...')
                 try:
-                    with _pool(WORKERS) as executor:
+                    with _pool(workers) as executor:
                         futures = {executor.submit(self._store_wad, fp, known, None, writer): rp
                                    for fp, rp in wad_files}
                         for future in track(as_completed(futures), total=len(futures), label=f'Storing patch {tag}'):
@@ -534,6 +605,7 @@ class LargeVCS:
             self._save_dups(tag, dups)
             self._save_patch(tag, patch)
 
+    @_lets_go
     def top_up(self, target, tag):
         """grab files riot added after we first stored this version"""
         self.ensure_repo()
@@ -588,6 +660,7 @@ class LargeVCS:
         tags = (os.path.splitext(os.path.basename(fp))[0] for fp in files)
         return sorted(t for t in tags if _TAG.fullmatch(t))
 
+    @_lets_go
     def drop(self, tag, collect=True):
         """collect=False when dropping several, then gc() once at the end. it reads every patch"""
         self.ensure_repo()
@@ -627,8 +700,8 @@ class LargeVCS:
             try:
                 self._restore(tag, clean, skip)
             finally:
-                # let go of the mmaps so other processes can compact
-                self.packs.close()
+                # let go of the mmaps so other processes can compact, and of the index
+                self.release()
 
     def _restore(self, tag, clean, skip):
         patch = self.get_patch(tag)
@@ -646,11 +719,22 @@ class LargeVCS:
 
         if current != tag:
             wad_bytes = sum(self._wad_size(h) for h, r in wanted if _is_wad_path(r) and r not in skip)
-            if current and self._park(current, wad_bytes):
-                current = None
-            if current is None and self._unpark(tag):
+            if tag in self.kept():
+                # it's sitting right there. park what's here if there's room, bin it if not
+                if not (current and self._park(current, 0)):
+                    self._clean()
+                self._unpark(tag)
+                self._drop_kept(self.kept()[max(self.keep_prepared - 1, 0):])
                 current = tag
                 print(f'Patch {tag} was kept ready.')
+            else:
+                if current and self._park(current, wad_bytes):
+                    current = None
+                # older kept copies go first if the drive can't fit the build
+                for old in reversed(self.kept()):
+                    if shutil.disk_usage(self.root).free >= wad_bytes + KEEP_MARGIN:
+                        break
+                    self._drop_kept([old])
 
         stubs = self.stubs() if current else set()
         if current == tag:
@@ -674,9 +758,7 @@ class LargeVCS:
                 print(f'Removing {len(stale)} outdated files...')
                 for rel_path in stale:
                     full_path = self.current_path(rel_path)
-                    if os.path.exists(full_path):
-                        os.chmod(full_path, stat.S_IWRITE)
-                        os.unlink(full_path)
+                    _unlink_blob(full_path)
 
         # write None first so a crash mid-restore gets rebuilt next time
         _write_json_atomic(self.current_patch_path, None)
@@ -740,9 +822,7 @@ class LargeVCS:
             if src and os.path.isfile(src):
                 try:
                     os.makedirs(os.path.dirname(out), exist_ok=True)
-                    if os.path.exists(out):
-                        os.chmod(out, stat.S_IWRITE)
-                        os.unlink(out)
+                    _unlink_blob(out)
                     os.link(src, out)
                     stubs.discard(r)
                     linked += 1
@@ -760,7 +840,7 @@ class LargeVCS:
             try:
                 self._export(tag, destination)
             finally:
-                self.packs.close()
+                self.release()
 
     def _export(self, tag, destination):
         patch = self.get_patch(tag)
@@ -813,7 +893,12 @@ class LargeVCS:
         return report
 
     def total_size(self):
-        total = self.packs.total_bytes()
+        total = 0
+        try:
+            with os.scandir(os.path.join(self.files_dir, 'packs')) as it:
+                total += sum(e.stat().st_size for e in it if e.is_file())
+        except FileNotFoundError:
+            pass
         with os.scandir(self.files_dir) as it:
             for entry in it:
                 if entry.is_file():
@@ -838,6 +923,7 @@ class LargeVCS:
                         loose_only.update(e['data_hash'] for e in m['entries'])
         return segs - loose_only
 
+    @_lets_go
     def repack(self, log=print):
         """rewrite the bundles so each archive's pieces sit together, in the order a rebuild reads them.
         rebuilding then reads long straight runs instead of hopping across tens of thousands of files.
@@ -862,7 +948,8 @@ class LargeVCS:
                 log('Nothing to rearrange.')
                 return
             old_index = dict(packs.index)
-            old_bundles = sorted({base for base, _, _ in old_index.values()})
+            # from disk, so leftovers from a repack that got stopped go too
+            old_bundles = [name[:-4] for name, _ in packs._current_stamp()]
             old_bytes = sum(size for _, _, size in old_index.values())
             free = shutil.disk_usage(self.files_dir).free
             if free < old_bytes + MIN_FREE_BYTES:
@@ -917,6 +1004,7 @@ class LargeVCS:
             packs._remove_orphans()
             log(f'Done. {len(order):,} pieces in {len(packs._current_stamp())} bundles.')
 
+    @_lets_go
     def bundle(self, log=print):
         """bundle small files. windows hates hundreds of thousands of tiny files"""
         with self.lock:
@@ -952,11 +1040,18 @@ class LargeVCS:
             return cached[1]
 
         sizes = {}
-        packs = self.packs
 
+        # bundled pieces always come with their size in the manifest, anything without one is a loose
+        # file. so no need for the bundle index here, which is 100+ MB on a big storage folder
         def size_of(d, known=None):
             if d not in sizes:
-                sizes[d] = known if known is not None else self._blob_size(d, packs)
+                if known is not None:
+                    sizes[d] = known
+                else:
+                    try:
+                        sizes[d] = os.path.getsize(os.path.join(self.files_dir, d))
+                    except OSError:
+                        sizes[d] = 0
             return sizes[d]
 
         manifests = {}
@@ -1036,6 +1131,7 @@ class LargeVCS:
                     seen |= new
         return {'current': current, 'after': current - saved_from + after, 'wads': len(whole)}
 
+    @_lets_go
     def optimize(self, log=print):
         """old whole-file wads -> shared pieces.
 
@@ -1138,6 +1234,7 @@ class LargeVCS:
                 + (f', {kept} left as-is' if kept else '')
                 + (f', {removed} unused files removed' if removed else '') + '.')
 
+    @_lets_go
     def gc(self):
         """delete anything no patch points at (plus junk from crashed writes)"""
         with self.lock:

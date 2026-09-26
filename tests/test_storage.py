@@ -240,6 +240,18 @@ class CancelTest(RepoTest):
         self.repo.restore('P1')
         self.assertStagedEqual(inst)
 
+    def test_store_stopped_by_a_game_starting_is_redone_cleanly(self):
+        from large_vcs.progress import Cancelled
+        files = {f'f{i}.dll': bytes([i]) * 50 for i in range(30)}
+        files.update({f'DATA\\w{i}.wad.client': ('wad', random_assets(5, seed=60 + i), 60 + i) for i in range(6)})
+        inst = self.install('p1', files)
+        with self.cancel_after(1), self.assertRaises(Cancelled):
+            self.repo.add(inst, 'P1', workers=2)
+        self.assertNotIn('P1', self.repo.list())
+        self.repo.add(inst, 'P1', workers=2)
+        self.repo.restore('P1')
+        self.assertStagedEqual(inst)
+
     def test_cancelled_optimize_keeps_what_it_finished(self):
         from large_vcs.progress import Cancelled
         inst = self.install('p1', {f'DATA\\w{i}.wad.client': ('wad', random_assets(10, seed=50 + i), 50 + i) for i in range(8)})
@@ -279,6 +291,30 @@ class RepackTest(RepoTest):
             self.assertStagedEqual(inst)
         # running it again is fine
         self.repo.repack(log=lambda *_: None)
+        self.repo.restore('P1', clean=True)
+        self.assertStagedEqual(p1)
+
+    def test_stopped_repack_doesnt_leave_a_second_copy_behind(self):
+        from large_vcs.progress import Cancelled, reporting
+        p1 = self.install('p1', {r'DATA\x.wad.client': ('wad', random_assets(40, seed=33, size=(40, 60000)), 33)})
+        self.repo.add(p1, 'P1')
+        self.repo.repack(log=lambda *_: None)
+        one_copy = self.repo.packs.total_bytes()
+        ev, write_one = threading.Event(), self.repo.packs._write_one
+
+        def stop_after_a_few(blobs):
+            out = write_one(blobs)
+            if len(self.repo.packs._current_stamp()) >= 4:
+                ev.set()
+            return out
+        # tiny bundles so some get written before it stops
+        with mock.patch('large_vcs.packs.PACK_TARGET', 4096), \
+                mock.patch.object(self.repo.packs, '_write_one', stop_after_a_few), \
+                reporting(lambda *_: None, ev), self.assertRaises(Cancelled):
+            self.repo.repack(log=lambda *_: None)
+        self.assertGreater(self.repo.packs.total_bytes(), one_copy)
+        self.repo.packs.compact(self.repo._segment_hashes(), min_dead=0)
+        self.assertLessEqual(self.repo.packs.total_bytes(), one_copy)
         self.repo.restore('P1', clean=True)
         self.assertStagedEqual(p1)
 
@@ -346,6 +382,40 @@ class KeepReadyTest(RepoTest):
         # and asking for quick start after that doesn't downgrade anything
         self.repo.restore('P1', skip={zed})
         self.assertStagedEqual(self.p1)
+
+    def full_drive(self):
+        return mock.patch('large_vcs.shutil.disk_usage', return_value=shutil._ntuple_diskusage(1, 1, 0))
+
+    def test_kept_patch_is_used_even_with_the_drive_full(self):
+        self.repo.restore('P1')
+        self.repo.restore('P2')
+        with self.full_drive(), \
+                mock.patch('league_vcs.parsers.wad.pack_wad_exact', side_effect=AssertionError('rebuilt')):
+            self.repo.restore('P1')
+        self.assertStagedEqual(self.p1)
+        # no room to keep P2 around as well
+        self.assertEqual(self.repo.kept(), [])
+
+    def test_kept_copies_make_room_for_a_build(self):
+        self.repo.keep_prepared = 3
+        p3 = self.install('p3', {'a.dll': b'three'})
+        self.repo.add(p3, 'P3')
+        self.repo.restore('P1')
+        self.repo.restore('P2')
+        with self.full_drive():
+            self.repo.restore('P3')
+        self.assertStagedEqual(p3)
+        self.assertEqual(self.repo.kept(), [])
+
+    def test_clearing_prepared_files_leaves_stored_ones_read_only(self):
+        self.repo.keep_prepared = 1
+        self.repo.restore('P1')
+        self.repo.restore('P2')
+        stored = os.path.join(self.repo.files_dir, hash_file(os.path.join(self.p1, 'a.dll')))
+        self.assertFalse(os.stat(stored).st_mode & stat.S_IWRITE)
+        self.repo.clean()
+        stored = os.path.join(self.repo.files_dir, hash_file(os.path.join(self.p2, 'a.dll')))
+        self.assertFalse(os.stat(stored).st_mode & stat.S_IWRITE)
 
     def test_placeholders_follow_a_kept_patch_around(self):
         zed = r'DATA\FINAL\Champions\Zed.wad.client'

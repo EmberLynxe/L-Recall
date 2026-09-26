@@ -674,6 +674,7 @@ window.__console_done = status => {
   $('con-sp').className = 'working ' + (ok ? 'ok' : cancelled ? '' : 'bad');
   $('con-prog').classList.toggle('bad', !ok && !cancelled);
   if (ok && $('con-prog').classList.contains('on')) { $('con-pfill').style.width = '100%'; $('con-pnum').textContent = 'Done'; }
+  else if (_pg) $('con-pnum').textContent = _pg.num || '';
   if (_conNotify && (document.hidden || !document.hasFocus())) call('notify', { title: $('con-title').textContent, status: ok ? 'ok' : cancelled ? 'cancelled' : 'failed' });
 };
 window.__console_cancellable = on => { $('con-cancel').style.display = on ? '' : 'none'; };
