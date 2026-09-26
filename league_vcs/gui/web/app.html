@@ -493,47 +493,46 @@ tr.me .pl-n { color: var(--accent); }
       <div class="ph" style="margin-bottom:16px"><h1>Settings</h1></div>
       <div class="form">
         <div class="frow">
-          <div><h3>Riot ID</h3><p>Results are shown from this player's side. Comma-separate multiple accounts.</p></div>
+          <div><h3>Riot ID</h3><p>Your account name, so wins, losses and your champion show from your side. Got more than one account? Separate them with commas.</p></div>
           <div>
             <div class="inl"><input class="input" id="me-inp" placeholder="Name#TAG" spellcheck="false"><button class="btn" onclick="saveMe()">Save</button></div>
             <div class="hint" id="me-det"></div>
           </div>
         </div>
         <div class="frow">
-          <div><h3>Replay folders</h3><p>Searched for .rofl files, including subfolders.</p></div>
+          <div><h3>Replay folders</h3><p>Where L-Recall looks for your replays (.rofl files). Folders inside these are checked too.</p></div>
           <div>
             <div class="plist" id="fl-list"></div>
             <div class="inl"><button class="btn" onclick="addFolder()">Add...</button><button class="btn" id="rm-fl-btn" disabled onclick="rmFolder()">Remove</button></div>
           </div>
         </div>
         <div class="frow">
-          <div><h3>Game installs</h3><p>Checked hourly. New patches are stored after the client finishes updating.</p></div>
+          <div><h3>Game installs</h3><p>Your League install. Every hour L-Recall checks it, and once Riot's finished updating, it saves a copy of the new patch.</p></div>
           <div>
             <div class="plist" id="gp-list"></div>
             <div class="inl"><button class="btn" onclick="findGP()" title="Look for League installs on this PC">Find</button><button class="btn" onclick="addGP()">Add...</button><button class="btn" id="rm-gp-btn" disabled onclick="rmGP()">Remove</button></div>
           </div>
         </div>
         <div class="frow">
-          <div><h3>Patch storage</h3><p>Folder containing <b>lvcs</b>.</p></div>
+          <div><h3>Patch storage</h3><p>Where saved patches are kept. Patches share a lot of their files, so saving the next one usually only adds a few GB.</p></div>
           <div>
             <div class="inl"><div class="path" id="repo-path"></div><button class="btn" onclick="pickRepo()">Change...</button></div>
             <div class="hint bad" id="repo-note"></div>
+            <div class="inl" style="margin-top:10px"><button class="btn" onclick="repackStorage()">Rearrange storage</button></div>
+            <div class="hint">Optional. Tidies the saved files so patches get ready faster. Takes a few minutes, and it's safe to stop halfway.</div>
           </div>
         </div>
         <div class="frow">
-          <div><h3>Starting replays</h3><p>A replay on a patch that isn't ready yet gets built first. How long that takes mostly comes down to your drive.</p></div>
+          <div><h3>Watching replays</h3><p>Before an old replay plays, its patch gets put back together from storage. That takes a minute or two, depending on your drive.</p></div>
           <div>
             <div class="inl"><select class="input" id="keep-sel" style="width:auto" onchange="setReplayStart({ keep: +this.value })">
               <option value="1">Keep 1 patch ready</option><option value="2">Keep 2 patches ready</option>
               <option value="3">Keep 3 patches ready</option><option value="4">Keep 4 patches ready</option></select></div>
-            <div class="hint">Going back to a patch that's kept ready is instant. Each one takes about 25 to 30 GB.</div>
-            <label class="check"><input type="checkbox" id="quick-chk" onchange="setReplayStart({ quick: this.checked })"> Quick start: only build the champions in the replay (testing)</label>
-            <div class="inl" style="margin-top:10px"><button class="btn" onclick="repackStorage()">Rearrange storage</button></div>
-            <div class="hint">Puts stored pieces in the order they're read, so patches build faster. Takes a while and needs some free space while it runs. Safe to stop.</div>
+            <div class="hint">Recently used patches stay ready, so going back to one starts straight away. Each one ready uses about 25 to 30 GB.</div>
           </div>
         </div>
         <div class="frow">
-          <div><h3>Champion &amp; item icons</h3><p>Kept on disk from Data Dragon so replays load instantly and work offline.</p></div>
+          <div><h3>Champion &amp; item icons</h3><p>The little pictures in the replay list. Saved on your PC so they show up fast, even offline.</p></div>
           <div>
             <div class="cache-info" id="dd-info">...</div>
             <div class="inl">
@@ -541,20 +540,20 @@ tr.me .pl-n { color: var(--accent); }
               <button class="btn" onclick="ddRefresh()" title="Check for a newer patch and fill in anything missing">Refresh</button>
               <button class="btn danger" onclick="ddClear()">Clear</button>
             </div>
-            <label class="check"><input type="checkbox" id="dd-auto" onchange="ddAuto(this.checked)"> Download new patch icons automatically</label>
+            <label class="check"><input type="checkbox" id="dd-auto" onchange="ddAuto(this.checked)"> Get icons for new patches automatically</label>
           </div>
         </div>
         <div class="frow">
-          <div><h3>Riot Vanguard</h3><p>Pre-Check is strongly recommended. It switches Vanguard on and off by itself. With it off, Vanguard is always on and blocks replays.</p></div>
+          <div><h3>Riot Vanguard</h3><p>Turn on Vanguard's Pre-Check if you can. It switches Vanguard on only when a game starts. Without it, Vanguard stays on all the time and stops replays from opening.</p></div>
           <div>
             <div class="cache-info" id="vg-info">...</div>
             <p class="legal" style="margin-top:0">L-Recall only reads Vanguard's status. It never changes it or tries to get around it.</p>
             <div class="inl" style="margin-top:8px"><button class="btn" onclick="openLink('https://support.riotgames.com/en-us/league-of-legends/performance/riot-vanguard-faq-league-of-legends')">Riot's Vanguard FAQ</button></div>
-            <label class="check"><input type="checkbox" id="vg-warn" onchange="vgWarn(this.checked)"> Warn before watching pre-Vanguard replays while Vanguard is on</label>
+            <label class="check"><input type="checkbox" id="vg-warn" onchange="vgWarn(this.checked)"> Warn me before watching replays from before patch 14.9 while Vanguard is on</label>
           </div>
         </div>
         <div class="frow">
-          <div><h3>Updates</h3><p>Checks GitHub for new releases. Nothing about you gets sent.</p></div>
+          <div><h3>Updates</h3><p>Checks GitHub for a newer version every now and then. Nothing about you is sent.</p></div>
           <div>
             <div class="cache-info" id="upd-info">...</div>
             <div class="inl">
@@ -566,7 +565,7 @@ tr.me .pl-n { color: var(--accent); }
           </div>
         </div>
         <div class="frow">
-          <div><h3>Uninstall</h3><p>Removes the startup entry, icon cache, settings and program files. Your replay files are never touched.</p></div>
+          <div><h3>Uninstall</h3><p>Removes L-Recall from this PC. Your replays are never touched, and saved patches stay unless you tick the box.</p></div>
           <div>
             <div class="cache-info" id="un-info">...</div>
             <div class="inl"><button class="btn danger" onclick="uninstallApp()">Uninstall L-Recall...</button></div>
@@ -1573,7 +1572,6 @@ async function loadSettings() {
   selFI = selGI = -1; $('rm-fl-btn').disabled = $('rm-gp-btn').disabled = true;
   $('dd-auto').checked = config.auto_download_assets !== false;
   $('keep-sel').value = String(config.keep_prepared || 2);
-  $('quick-chk').checked = !!config.quick_start;
   loadCacheInfo();
   loadVanguard();
   loadUpdateInfo();
@@ -1651,7 +1649,7 @@ async function repackStorage() {
   openCon('Rearranging storage');
   await call('repack_storage');
 }
-async function setReplayStart(opts) { await call('set_replay_start', opts); Object.assign(config, opts.keep ? { keep_prepared: opts.keep } : { quick_start: opts.quick }); }
+async function setReplayStart(opts) { await call('set_replay_start', opts); config.keep_prepared = opts.keep; }
 async function vgWarn(on) { await call('set_vanguard_warn', { on }); }
 async function loadCacheInfo() {
   try {
@@ -1682,7 +1680,7 @@ async function loadUninstallInfo() {
   try {
     const u = await call('uninstall_info');
     $('un-info').innerHTML = u.patch_bytes
-      ? 'Stored patches use <b>' + gb(u.patch_bytes) + '</b> in ' + esc(u.repository) + '. They\'re kept unless you tick the box.'
+      ? 'Saved patches use <b>' + gb(u.patch_bytes) + '</b> in ' + esc(u.repository) + '.'
       : 'No stored patches.';
     $('un-patches').disabled = !u.patch_bytes;
     if (!u.patch_bytes) $('un-patches').checked = false;

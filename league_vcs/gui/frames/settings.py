@@ -502,7 +502,9 @@ class SettingsFrame(CallbackFrame):
         selfupdate.apply(new, os.path.dirname(sys.executable))
         print('L-Recall will close and open again on the new version in a few seconds.')
         if self._quit_app:
-            wx.CallLater(2500, self._quit_app)
+            # this runs on the worker thread and wx timers can only start on the main one. it used to
+            # blow up here, so the app never closed and the update sat waiting for it
+            wx.CallAfter(wx.CallLater, 2500, self._quit_app)
 
     def _handle_dismiss_update(self, req_id, msg):
         self.config['dismissed_update'] = msg.get('version', '')
@@ -572,8 +574,6 @@ class SettingsFrame(CallbackFrame):
             core.keep_prepared = self.config['keep_prepared'] = max(1, min(4, int(msg['keep'])))
             if core.repo:
                 core.repo.keep_prepared = core.keep_prepared
-        if 'quick' in msg:
-            core.quick_start = self.config['quick_start'] = bool(msg['quick'])
         self.config.save()
         self._respond(req_id, True)
 
@@ -746,7 +746,7 @@ class SettingsFrame(CallbackFrame):
         else:
             print('Running from source, so the program files are left alone.')
         if self._quit_app:
-            wx.CallLater(4000, self._quit_app)
+            wx.CallAfter(wx.CallLater, 4000, self._quit_app)  # worker thread, same as updating
 
     def _do_export_patches(self, patches, destination):
         core.set_repo_path(self.config['repository'])
