@@ -165,7 +165,7 @@ def top_up(directory):
     added = repo.top_up(directory, version)
     if added and (_install_stamp(directory) != before or GameParser(game_path).version != version):
         with repo.lock:
-            repo._save_dups(version, old_dups)
+            repo._save_dups(version, old_dups, keep_file=True)
             repo._save_patch(version, old_patch)
             if repo.current() == version:
                 repo.clean()

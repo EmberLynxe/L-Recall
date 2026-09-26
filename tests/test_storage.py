@@ -199,6 +199,159 @@ class StorageTest(RepoTest):
         self.assertEqual(len(entries), len(assets) + 1)
 
 
+class PlaceholderTest(RepoTest):
+    """patches from the original league vcs kept one name for riot's empty archive and lost the rest.
+    the game won't start without Audio.wad.client"""
+    AUDIO, TFT = r'DATA\FINAL\Audio.wad.client', r'DATA\FINAL\Champions\TFTChampion.en_US.wad.client'
+    ONLINE, OLD_NAME = r'DATA\FINAL\Online.wad.client', r'DATA\FINAL\TFTSet10.wad.client'
+
+    def make_old(self, tag):
+        """no .dups file at all, like the ones the original tool stored"""
+        try:
+            os.unlink(self.repo._dups_path(tag))
+        except FileNotFoundError:
+            pass
+
+    def test_old_patch_gets_its_missing_names_back(self):
+        new = self.install('new', {'a.dll': b'new', self.AUDIO: large_vcs.STUB_WAD, self.TFT: large_vcs.STUB_WAD})
+        old = self.install('old', {'a.dll': b'old', self.AUDIO: large_vcs.STUB_WAD, self.TFT: large_vcs.STUB_WAD})
+        self.repo.add(new, 'P2')
+        self.repo.add(old, 'P1')
+        # one name kept (tft, like 16.18 on disk), the rest gone
+        patch = self.repo.get_patch('P1')
+        key = next(c for c, r in patch.items() if r in (self.AUDIO, self.TFT))
+        patch[key] = self.TFT
+        self.repo._save_patch('P1', patch)
+        self.make_old('P1')
+        self.assertNotIn(self.AUDIO, {r for _, r in self.repo.pairs('P1')})
+        self.repo.restore('P1')
+        for rel in ('a.dll', self.AUDIO, self.TFT):
+            self.assertEqual(hash_file(self.repo.current_path(rel)), hash_file(os.path.join(old, rel)))
+        # fixed for good, nothing more to add next time
+        self.assertEqual(self.repo.fill_placeholders(), {})
+
+    def test_properly_recorded_patch_is_left_alone(self):
+        # riot really did ship it under one name here. current code marks that, so nothing gets added
+        p = self.install('p1', {self.TFT: large_vcs.STUB_WAD, 'a.dll': b'x'})
+        self.repo.add(p, 'P1')
+        self.assertEqual(self.repo.fill_placeholders(), {})
+        self.repo.restore('P1')
+        self.assertStagedEqual(p)
+
+    def test_real_files_are_never_swapped_for_the_empty_one(self):
+        real = self.install('p1', {self.TFT: large_vcs.STUB_WAD, self.ONLINE: ('wad', random_assets(5, seed=9), 9)})
+        self.repo.add(real, 'P1')
+        self.make_old('P1')
+        self.repo.restore('P1')
+        self.assertTrue(os.path.exists(self.repo.current_path(self.AUDIO)))
+        self.assertEqual(hash_file(self.repo.current_path(self.ONLINE)), hash_file(os.path.join(real, self.ONLINE)))
+
+    def test_found_by_what_it_is_not_its_name(self):
+        # whole file format, under a name that isn't one of the 16.19 ones
+        with open(os.path.join(self.repo.files_dir, large_vcs.STUB_SHA), 'wb') as f:
+            f.write(large_vcs.STUB_WAD)
+        self.repo._save_patch('P1', {large_vcs.STUB_SHA: self.OLD_NAME})
+        self.repo.restore('P1')
+        for rel in (self.OLD_NAME, self.AUDIO):
+            with open(self.repo.current_path(rel), 'rb') as f:
+                self.assertEqual(f.read(), large_vcs.STUB_WAD)
+
+    def test_old_manifest_format_too(self):
+        path = os.path.join(self.tmp, 'empty.wad.client')
+        with open(path, 'wb') as f:
+            f.write(large_vcs.STUB_WAD)
+        manifest, _ = unpack_wad(path, self.repo.files_dir)
+        self.repo._save_patch('P1', {_store_manifest(self.repo.files_dir, manifest): self.OLD_NAME})
+        self.repo.restore('P1')
+        self.assertEqual(parse_wad(self.repo.current_path(self.AUDIO))[3], [])
+
+    def test_patch_without_the_empty_archive_is_left_alone(self):
+        p = self.install('p1', {'a.dll': b'x'})
+        self.repo.add(p, 'P1')
+        self.make_old('P1')
+        self.assertEqual(self.repo.fill_placeholders(), {})
+
+
+class CrashSafetyTest(RepoTest):
+    def test_switch_that_dies_halfway_gets_rebuilt_properly(self):
+        # shared.dll changes P1 -> P2 and changes back in P3. a switch that died after deleting it but
+        # still said P1 meant P3 trusted it was there
+        self.repo.keep_prepared = 1
+        p1 = self.install('p1', {'shared.dll': b'A', 'only1.dll': b'1', 'zz.dll': b'z'})
+        p2 = self.install('p2', {'shared.dll': b'B'})
+        p3 = self.install('p3', {'shared.dll': b'A', 'only3.dll': b'3'})
+        for tag, inst in (('P1', p1), ('P2', p2), ('P3', p3)):
+            self.repo.add(inst, tag)
+        self.repo.restore('P1')
+        real = large_vcs._unlink_blob
+
+        def fails_on_zz(path):
+            if path.endswith('zz.dll'):
+                raise PermissionError(5, 'Access is denied')
+            return real(path)
+        with mock.patch('large_vcs._unlink_blob', side_effect=fails_on_zz), self.assertRaisesRegex(ValueError, 'still closing'):
+            self.repo.restore('P2')
+        self.assertIsNone(self.repo.current())
+        self.repo.restore('P3')
+        self.assertStagedEqual(p3)
+
+    def test_retrying_while_the_game_holds_a_file_never_mixes_patches(self):
+        self.repo.keep_prepared = 1
+        p1 = self.install('p1', {'a.dll': b'1', 'z.dll': b'z'})
+        p3 = self.install('p3', {'a.dll': b'3'})
+        self.repo.add(p1, 'P1')
+        self.repo.add(p3, 'P3')
+        self.repo.restore('P1')
+        held = open(self.repo.current_path('z.dll'), 'rb')  # the game, not quite closed yet
+        try:
+            with mock.patch('large_vcs.time.sleep'):
+                for _ in range(2):
+                    with self.assertRaisesRegex(ValueError, 'still closing'):
+                        self.repo.restore('P3')
+            self.assertNotEqual(self.repo.current(), 'P3')
+        finally:
+            held.close()
+        self.repo.restore('P3')
+        self.assertStagedEqual(p3)
+        self.assertFalse(os.path.exists(self.repo.path('trash')))
+
+    def test_build_that_dies_leaves_no_cut_off_archive(self):
+        inst = self.install('p1', {r'DATA\x.wad.client': ('wad', random_assets(10, seed=12), 12)})
+        self.repo.add(inst, 'P1')
+
+        def half(manifest, files_dir, out, packs=None, progress=None):
+            with open(out, 'wb') as f:
+                f.write(b'half an archive')
+            raise OSError('disk full')
+        with mock.patch('league_vcs.parsers.wad.pack_wad_exact', side_effect=half), self.assertRaises(OSError):
+            self.repo.restore('P1')
+        self.assertFalse(os.path.exists(self.repo.current_path(r'DATA\x.wad.client')))
+        self.assertFalse(os.path.exists(self.repo.current_path(r'DATA\x.wad.client.part')))
+        self.repo.restore('P1')
+        self.assertStagedEqual(inst)
+
+    def test_waiting_on_storage_can_be_cancelled(self):
+        from large_vcs.progress import Cancelled, reporting
+        held, done = threading.Event(), threading.Event()
+
+        def hold():
+            with self.repo.lock:
+                held.set()
+                done.wait(10)
+        t = threading.Thread(target=hold)
+        t.start()
+        held.wait(5)
+        stop = threading.Event()
+        stop.set()
+        try:
+            with reporting(lambda *_: None, stop), self.assertRaises(Cancelled):
+                with self.repo.lock:
+                    pass
+        finally:
+            done.set()
+            t.join()
+
+
 class DeleteTest(RepoTest):
     def test_wipe_only_takes_its_own_folders(self):
         inst = self.install('p1', {'a.dll': b'a', r'DATA\x.wad.client': ('wad', random_assets(5, seed=11), 11)})
@@ -427,6 +580,24 @@ class KeepReadyTest(RepoTest):
         stored = os.path.join(self.repo.files_dir, hash_file(os.path.join(self.p2, 'a.dll')))
         self.assertFalse(os.stat(stored).st_mode & stat.S_IWRITE)
 
+    def test_game_still_holding_files_leaves_everything_alone(self):
+        self.repo.restore('P1')
+        real_rename = os.rename
+
+        def locked(src, dst):
+            if 'prepared' in dst:
+                raise PermissionError(5, 'Access is denied')
+            return real_rename(src, dst)
+        with mock.patch('large_vcs.os.rename', side_effect=locked), mock.patch('large_vcs.time.sleep'), \
+                self.assertRaisesRegex(ValueError, 'still closing'):
+            self.repo.restore('P2')
+        # nothing touched, P1's still there and ready
+        self.assertEqual(self.repo.current(), 'P1')
+        self.assertStagedEqual(self.p1)
+        self.assertEqual(self.repo.kept(), [])
+        self.repo.restore('P2')
+        self.assertStagedEqual(self.p2)
+
     def test_placeholders_follow_a_kept_patch_around(self):
         zed = r'DATA\FINAL\Champions\Zed.wad.client'
         self.repo.restore('P1', skip={zed})
@@ -478,6 +649,20 @@ class HostileStorageTest(RepoTest):
         self.write_patch('BAD', {_store_manifest(self.repo.files_dir, manifest): r'DATA\x.wad.client'})
         with self.assertRaises(ValueError):
             self.repo.restore('BAD')
+
+    def test_current_json_cant_point_outside(self):
+        victim = os.path.join(self.tmp, 'victim')
+        os.makedirs(victim)
+        with open(os.path.join(victim, 'keep.txt'), 'w') as f:
+            f.write('mine')
+        inst = self.install('p1', {'a.dll': b'a'})
+        self.repo.add(inst, 'P1')
+        os.makedirs(self.repo.current_path(), exist_ok=True)
+        with open(self.repo.current_patch_path, 'w') as f:
+            json.dump('../victim', f)
+        self.assertIsNone(self.repo.current())
+        self.repo.restore('P1')
+        self.assertTrue(os.path.exists(os.path.join(victim, 'keep.txt')))
 
     def test_patch_names_cant_be_paths(self):
         for bad in (r'..\..\x', 'a/b', 'C:x', ''):

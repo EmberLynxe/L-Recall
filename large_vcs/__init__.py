@@ -9,11 +9,12 @@ import shutil
 import signal
 import stat
 import threading
+import time
 from contextlib import contextmanager
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, as_completed, wait
 from multiprocessing import Pool
 
-from .progress import Cancelled, check, step, track
+from .progress import Cancelled, cancel_event, check, step, track
 
 from .packs import PackStore, PackWriter
 
@@ -34,6 +35,15 @@ STUB_WAD = base64.b64decode(
     'vrvYuGji8bjfdmhM+sAbOgm5Gg/5JYE5RKgoyQqyziaIsb9kWXWNS5CuEDuMs2CT0kGeyk0/LdjLfc/5W2h4DVl2JgDt'
     'QJLNZRHSvoUghDYuiMVzZUaLOGNfqcVRdb6/yl+ilkD21rR/iDBOnkd/+K8svDeJzTYfnouABNpq/85oppVbwcrzxxq5'
     'Qj9nueOodSQvzrTQl4OoJz055+xE4HAtqObGaaMiL3bSbSikOVjRQdKlqh1QjrLjBS4Z5maZ6dhRN9tG7wAAAAA=')
+
+STUB_SHA = hashlib.sha256(STUB_WAD).hexdigest()
+STILL_CLOSING = 'League is still closing, so its files are still in use. Give it a few seconds and try again.'
+# names riot ships that empty archive under (16.19). the game won't start without Audio.wad.client.
+# patches stored by the original league vcs only kept one name per identical file, see fill_placeholders
+PLACEHOLDER_NAMES = (r'DATA\FINAL\Audio.wad.client', r'DATA\FINAL\Online.wad.client',
+                     r'DATA\FINAL\TFTSet9.wad.client', r'DATA\FINAL\TFTSet12.wad.client',
+                     r'DATA\FINAL\TFTSet13Evolved.wad.client', r'DATA\FINAL\TFTSetEventPM.wad.client',
+                     r'DATA\FINAL\Champions\TFTChampion.en_US.wad.client')
 
 _pack_stores = {}
 
@@ -81,8 +91,18 @@ class _RepoLock:
         self._handle = win32event.CreateMutex(None, False, 'Local\\league_vcs_repo_' + key)
 
     def __enter__(self):
-        self._ev.WaitForSingleObject(self._handle, self._ev.INFINITE)
+        # short waits, so a job queued behind a patch being stored says so and can still be cancelled
+        told = False
+        while self._ev.WaitForSingleObject(self._handle, 500) == self._ev.WAIT_TIMEOUT:
+            if not told:
+                print('Waiting for patch storage to finish what it\'s doing...')
+                told = True
+            check()
         return self
+
+    def try_enter(self):
+        """take it only if it's free right now"""
+        return self._ev.WaitForSingleObject(self._handle, 0) != self._ev.WAIT_TIMEOUT
 
     def __exit__(self, *exc):
         self._ev.ReleaseMutex(self._handle)
@@ -364,11 +384,16 @@ class LargeVCS:
 
     def release(self):
         """drop the bundle index. it's only needed mid-job and it's 100+ MB on a big storage folder,
-        so every job lets go of it at the end instead of it sitting in the tray forever"""
-        with self.lock:
+        so every job lets go of it at the end instead of it sitting in the tray forever. if another job
+        has the lock it's using the index, and it lets go itself when it's done"""
+        if not self.lock.try_enter():
+            return
+        try:
             store = _pack_stores.pop(self.files_dir, None)
             if store is not None:
                 store.close()
+        finally:
+            self.lock.__exit__()
 
     def _blob_size(self, digest, packs=None):
         packs = packs or self.packs
@@ -422,8 +447,10 @@ class LargeVCS:
                 _check_rel(rel_path)
         return dups
 
-    def _save_dups(self, tag, dups):
-        if dups:
+    def _save_dups(self, tag, dups, keep_file=False):
+        """keep_file: write it even when empty. that's the mark that says this patch's names were
+        recorded properly, see fill_placeholders"""
+        if dups or keep_file:
             _write_json_atomic(self._dups_path(tag), dups)
         else:
             try:
@@ -451,24 +478,50 @@ class LargeVCS:
     def current(self):
         try:
             with open(self.current_patch_path) as file:
-                return json.load(file)
-        except FileNotFoundError:
+                tag = json.load(file)
+        except (FileNotFoundError, ValueError):
             return None
+        # it ends up in paths that get deleted, so only ever trust a real tag
+        return tag if isinstance(tag, str) and _TAG.fullmatch(tag) else None
 
     def clean(self):
         with self.lock:
             self._clean()
 
     def _clean(self):
-        _delete_tree([self.current_path()], 'Removing prepared files')
+        """moved out of the way first, then deleted. a rename either works or touches nothing, so a file
+        the game still has open can't leave bits of the old patch for the next one to get built around"""
+        self._empty_trash()
+        if os.path.lexists(self.current_path()):
+            os.makedirs(self.path('trash'), exist_ok=True)
+            for attempt in range(6):
+                try:
+                    os.rename(self.current_path(), self.path('trash', str(time.time_ns())))
+                    break
+                except PermissionError:
+                    if attempt == 5:
+                        raise ValueError(STILL_CLOSING) from None
+                    time.sleep(0.5)
         self._save_stubs(set())
         try:
             os.unlink(self.current_patch_path)
         except FileNotFoundError:
             pass
+        self._empty_trash()
+
+    def _empty_trash(self):
+        """whatever _clean moved aside. anything still in use just waits for next time"""
+        trash = self.path('trash')
+        if os.path.isdir(trash):
+            _delete_tree([os.path.join(trash, n) for n in os.listdir(trash)], 'Removing prepared files')
+            try:
+                os.rmdir(trash)
+            except OSError:
+                pass
 
     def _drop_kept(self, tags=None):
         for tag in (self.kept() if tags is None else tags):
+            _check_tag(tag)
             if os.path.isdir(self.kept_path(tag)):
                 _delete_tree([self.kept_path(tag)], f'Removing kept copy of {tag}')
             self._save_stubs(set(), tag)
@@ -486,7 +539,20 @@ class LargeVCS:
         # through otherwise leaves riot's empty archives looking like the real ones
         self._save_stubs(self.stubs(), tag)
         _write_json_atomic(self.current_patch_path, None)
-        os.rename(self.current_path(), self.kept_path(tag))
+        # right after the game closes (or crashes) windows can still have its files open for a few
+        # seconds, the crash reporter especially. wait a bit, then just switch in place like before
+        for attempt in range(20):
+            try:
+                os.rename(self.current_path(), self.kept_path(tag))
+                break
+            except PermissionError:
+                if attempt == 19:
+                    # put everything back how it was. deleting or switching in place now is what
+                    # used to lose the prepared copy or leave files missing
+                    _write_json_atomic(self.current_patch_path, tag)
+                    self._save_stubs(set(), tag)
+                    raise ValueError(STILL_CLOSING) from None
+                time.sleep(0.5)
         os.utime(self.kept_path(tag))
         self._save_stubs(set())
         os.unlink(self.current_patch_path)
@@ -602,7 +668,7 @@ class LargeVCS:
                 finally:
                     writer.seal()
 
-            self._save_dups(tag, dups)
+            self._save_dups(tag, dups, keep_file=True)
             self._save_patch(tag, patch)
 
     @_lets_go
@@ -641,7 +707,7 @@ class LargeVCS:
                     added.append((checksum, rel))
             finally:
                 writer.seal()
-            self._save_dups(tag, dups)
+            self._save_dups(tag, dups, keep_file=True)
             self._save_patch(tag, patch)
 
             if self.current() == tag and os.path.isdir(self.current_path()):
@@ -688,10 +754,24 @@ class LargeVCS:
         manifest = _load_manifest(self.files_dir, checksum)
         if manifest is None:
             load_from_repo(os.path.join(self.files_dir, checksum), output_path)
-        elif 'segments' in manifest:
-            pack_wad_exact(manifest, self.files_dir, output_path, self.packs, progress)
-        else:
-            pack_wad(manifest, self.files_dir, output_path)
+            return
+        # built next to the real one and swapped in, so dying halfway (top up, exit, power cut) never
+        # leaves a cut off archive with the right name
+        tmp = output_path + '.part'
+        try:
+            if 'segments' in manifest:
+                pack_wad_exact(manifest, self.files_dir, tmp, self.packs, progress)
+            else:
+                pack_wad(manifest, self.files_dir, tmp)
+            if os.path.lexists(output_path):
+                _unlink_blob(output_path)
+            os.replace(tmp, output_path)
+        except BaseException:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
 
     def restore(self, tag, clean=False, skip=()):
         """make tag the prepared patch. skip = wad paths that can be placeholders this time (quick start)"""
@@ -703,7 +783,50 @@ class LargeVCS:
                 # let go of the mmaps so other processes can compact, and of the index
                 self.release()
 
+    def _is_stub(self, checksum):
+        """is this riot's empty archive, whichever way it got stored"""
+        path = os.path.join(self.files_dir, checksum)
+        try:
+            if os.path.getsize(path) > 4096:
+                return False  # the empty archive and its manifests are all tiny
+        except OSError:
+            return False
+        m = _load_manifest(self.files_dir, checksum)
+        if m is None:
+            try:
+                with open(path, 'rb') as f:
+                    return f.read(len(STUB_WAD) + 1) == STUB_WAD
+            except OSError:
+                return False
+        if 'segments' in m:
+            return m.get('sha256') == STUB_SHA
+        return m.get('entries') == []  # the old manifest format, an archive with nothing in it
+
+    def fill_placeholders(self, tags=None):
+        """put back the names of riot's empty archive that old patches lost (the original league vcs
+        kept one name per identical file). only for patches it didn't record properly, which have no
+        .dups file at all. only names in PLACEHOLDER_NAMES, only if the patch has the empty archive,
+        and never over a name the patch already has. running it again adds nothing. returns {tag: added}"""
+        fixed = {}
+        for tag in (self.list() if tags is None else tags):
+            if os.path.exists(self._dups_path(tag)):
+                continue
+            patch = self.get_patch(tag) or {}
+            key = next((c for c, r in patch.items() if _is_wad_path(r) and self._is_stub(c)), None)
+            if key is None:
+                continue
+            have = {os.path.normcase(r) for _, r in self.pairs(tag, patch)}
+            add = [n for n in PLACEHOLDER_NAMES if os.path.normcase(n) not in have]
+            # written even if there's nothing to add, so it's only ever checked once
+            self._save_dups(tag, {key: add} if add else {}, keep_file=True)
+            if add:
+                fixed[tag] = len(add)
+        return fixed
+
     def _restore(self, tag, clean, skip):
+        added = self.fill_placeholders([tag]).get(tag)
+        if added:
+            print(f'Patch {tag} was missing {added} of Riot\'s empty placeholder archives, put them back.')
         patch = self.get_patch(tag)
         assert patch is not None, f'Patch {tag} does not exist!'
         wanted = self.pairs(tag, patch)
@@ -754,11 +877,18 @@ class LargeVCS:
             stale = sorted({r for _, r in have - wanted} | stubs)
             stubs = set()
             todo = wanted - have
+            # anything the old patch should have had but doesn't (deleted, or a switch that died halfway)
+            todo |= {(h, r) for h, r in wanted & have if not os.path.exists(self.current_path(r))}
+            # unfinished from here on. if a delete below fails or we die, the next go starts clean
+            _write_json_atomic(self.current_patch_path, None)
             if stale:
                 print(f'Removing {len(stale)} outdated files...')
                 for rel_path in stale:
-                    full_path = self.current_path(rel_path)
-                    _unlink_blob(full_path)
+                    try:
+                        _unlink_blob(self.current_path(rel_path))
+                    except PermissionError:
+                        # already marked unfinished above, so the next go rebuilds properly
+                        raise ValueError(STILL_CLOSING) from None
 
         # write None first so a crash mid-restore gets rebuilt next time
         _write_json_atomic(self.current_patch_path, None)
@@ -792,9 +922,12 @@ class LargeVCS:
             # once, so counting finished ones sat near 0% for ages and made the time left useless
             label = f'Building patch {tag}'
             count_lock, counted, per_wad = threading.Lock(), [0], {}
+            cancel = cancel_event()
 
             def build(cs, rp):
                 def wrote(n):
+                    if cancel is not None and cancel.is_set():
+                        raise Cancelled()
                     with count_lock:
                         counted[0] += n
                         per_wad[rp] = per_wad.get(rp, 0) + n
@@ -1193,7 +1326,8 @@ class LargeVCS:
                 for tag, patch in patches.items():
                     dups = self.get_dups(tag)
                     if any(c in pending for c in dups):
-                        self._save_dups(tag, {pending.get(c, c): ps for c, ps in dups.items()})
+                        self._save_dups(tag, {pending.get(c, c): ps for c, ps in dups.items()},
+                                        keep_file=os.path.exists(self._dups_path(tag)))
                     if any(c in pending for c in patch):
                         patches[tag] = {pending.get(c, c): rp for c, rp in patch.items()}
                         self._save_patch(tag, patches[tag])
@@ -1256,7 +1390,9 @@ class LargeVCS:
         with self.lock:
             referenced = set()
             for tag in track(self.list(), label='Checking which files are still used'):
-                referenced |= _collect_all_hashes(self.get_patch(tag) or {}, self.files_dir)
+                # dups keys are always in the patch too, but a file something points at never goes
+                dups = {c: ps[0] for c, ps in self.get_dups(tag).items() if ps}
+                referenced |= _collect_all_hashes({**dups, **(self.get_patch(tag) or {})}, self.files_dir)
             with os.scandir(self.files_dir) as it:
                 unused = [e.path for e in it if e.is_file() and e.name not in referenced]
             for path in track(unused, label='Deleting unused files'):
@@ -1269,7 +1405,8 @@ class LargeVCS:
         with self.lock:
             self.packs.close()
             _pack_stores.pop(self.files_dir, None)
-            _delete_tree([self.repo_path(), self.current_path(), self.kept_path()], 'Deleting stored patches')
+            _delete_tree([self.repo_path(), self.current_path(), self.kept_path(), self.path('trash')],
+                         'Deleting stored patches')
             try:
                 os.rmdir(self.root)  # only goes if it's empty
             except OSError:

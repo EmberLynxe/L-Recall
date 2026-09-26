@@ -27,6 +27,11 @@ def reporting(callback, cancel=None):
         _local.callback, _local.last, _local.cancel = previous
 
 
+def cancel_event():
+    """this thread's cancel flag, for handing to worker threads that can't see it"""
+    return getattr(_local, 'cancel', None)
+
+
 def check():
     """raise Cancelled if someone asked. for spots with no progress to report"""
     cancel = getattr(_local, 'cancel', None)
