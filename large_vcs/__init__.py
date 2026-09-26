@@ -1,3 +1,4 @@
+import base64
 import glob
 import hashlib
 import json
@@ -21,6 +22,16 @@ MANIFEST_PROBE = b'{"__wad_manifest__"'
 COMMIT_BYTES = 4 * 1024 ** 3
 MIN_FREE_BYTES = 8 * 1024 ** 3
 BUNDLE_MAX = 64 * 1024
+# room to leave on the drive when keeping an old patch ready means building the new one from scratch
+KEEP_MARGIN = 5 * 1024 ** 3
+
+# riot's own empty archive, byte for byte. they ship it as Audio.wad.client and a few others,
+# so the game's fine with it. quick start uses it for champions that aren't in the replay
+STUB_WAD = base64.b64decode(
+    'UlcDBBpO+D8pVKe2WRyMSJWV0ZSIP1V3mhGD0fTF61eS3cyOXf7BTuDPueoSDZscdLucYKdup5A4jQtnm3kwnO2MMB0Z'
+    'vrvYuGji8bjfdmhM+sAbOgm5Gg/5JYE5RKgoyQqyziaIsb9kWXWNS5CuEDuMs2CT0kGeyk0/LdjLfc/5W2h4DVl2JgDt'
+    'QJLNZRHSvoUghDYuiMVzZUaLOGNfqcVRdb6/yl+ilkD21rR/iDBOnkd/+K8svDeJzTYfnouABNpq/85oppVbwcrzxxq5'
+    'Qj9nueOodSQvzrTQl4OoJz055+xE4HAtqObGaaMiL3bSbSikOVjRQdKlqh1QjrLjBS4Z5maZ6dhRN9tG7wAAAAA=')
 
 _pack_stores = {}
 _cost_cache = {}
@@ -213,6 +224,8 @@ class LargeVCS:
         self.current_name = current_name
         self.do_copy = do_copy
         self.current_patch_path = self.repo_path('current.json')
+        # how many prepared patches to keep, the current one included. 1 = old behaviour
+        self.keep_prepared = 1
 
     def path(self, *parts):
         return os.path.abspath(os.path.join(self.root, *parts))
@@ -222,6 +235,38 @@ class LargeVCS:
 
     def current_path(self, *parts):
         return self.path(self.current_name, *parts)
+
+    def kept_path(self, *parts):
+        """older prepared patches, parked so switching back is a rename"""
+        return self.path('prepared', *parts)
+
+    def kept(self):
+        """tags of the parked ones, newest first"""
+        try:
+            names = [e for e in os.scandir(self.kept_path()) if e.is_dir() and _TAG.fullmatch(e.name)]
+        except FileNotFoundError:
+            return []
+        return [e.name for e in sorted(names, key=lambda e: e.stat().st_mtime, reverse=True)]
+
+    def _stubs_file(self, tag=None):
+        return self.kept_path(_check_tag(tag) + '.stubs.json') if tag else self.repo_path('current.stubs.json')
+
+    def stubs(self, tag=None):
+        """paths in a prepared folder that are only placeholders (quick start)"""
+        try:
+            with open(self._stubs_file(tag)) as f:
+                return {_check_rel(r) for r in json.load(f)}
+        except (FileNotFoundError, ValueError, TypeError):
+            return set()
+
+    def _save_stubs(self, stubs, tag=None):
+        if stubs:
+            _write_json_atomic(self._stubs_file(tag), sorted(stubs))
+        else:
+            try:
+                os.unlink(self._stubs_file(tag))
+            except FileNotFoundError:
+                pass
 
     @property
     def files_dir(self):
@@ -334,10 +379,51 @@ class LargeVCS:
 
     def _clean(self):
         _delete_tree([self.current_path()], 'Removing prepared files')
+        self._save_stubs(set())
         try:
             os.unlink(self.current_patch_path)
         except FileNotFoundError:
             pass
+
+    def _drop_kept(self, tags=None):
+        for tag in (self.kept() if tags is None else tags):
+            if os.path.isdir(self.kept_path(tag)):
+                _delete_tree([self.kept_path(tag)], f'Removing kept copy of {tag}')
+            self._save_stubs(set(), tag)
+
+    def _park(self, tag, room_needed):
+        """move the prepared folder aside instead of throwing it away. false if we're only keeping
+        one, or the drive's too full to build the next one next to it"""
+        if self.keep_prepared <= 1 or not os.path.isdir(self.current_path()):
+            return False
+        if shutil.disk_usage(self.root).free < room_needed + KEEP_MARGIN:
+            return False
+        self._drop_kept([tag])
+        os.makedirs(self.kept_path(), exist_ok=True)
+        os.rename(self.current_path(), self.kept_path(tag))
+        os.utime(self.kept_path(tag))
+        self._save_stubs(self.stubs(), tag)
+        self._save_stubs(set())
+        os.unlink(self.current_patch_path)
+        return True
+
+    def _unpark(self, tag):
+        if not os.path.isdir(self.kept_path(tag)):
+            return False
+        if os.path.exists(self.current_path()):
+            self._clean()
+        os.rename(self.kept_path(tag), self.current_path())
+        self._save_stubs(self.stubs(tag))
+        self._save_stubs(set(), tag)
+        # it was complete when it got parked
+        _write_json_atomic(self.current_patch_path, tag)
+        return True
+
+    def _wad_size(self, checksum):
+        m = _load_manifest(self.files_dir, checksum)
+        if m is None:
+            return os.path.getsize(os.path.join(self.files_dir, checksum))
+        return m.get('size') or 1
 
     @classmethod
     def load_or_create(cls, root):
@@ -495,6 +581,7 @@ class LargeVCS:
 
             os.unlink(self._patch_path(tag))
             self._save_dups(tag, {})
+            self._drop_kept([tag])
             if collect:
                 self.gc()
 
@@ -516,64 +603,139 @@ class LargeVCS:
         else:
             pack_wad(manifest, self.files_dir, output_path)
 
-    def restore(self, tag, clean=False):
+    def restore(self, tag, clean=False, skip=()):
+        """make tag the prepared patch. skip = wad paths that can be placeholders this time (quick start)"""
         self.ensure_repo()
         with self.lock:
             try:
-                self._restore(tag, clean)
+                self._restore(tag, clean, skip)
             finally:
                 # let go of the mmaps so other processes can compact
                 self.packs.close()
 
-    def _restore(self, tag, clean):
+    def _restore(self, tag, clean, skip):
         patch = self.get_patch(tag)
         assert patch is not None, f'Patch {tag} does not exist!'
-        current = self.current()
-
-        if not clean and tag == current and os.path.isdir(self.current_path()):
-            print(f'Already on {tag}.')
-            return
-
-        current_patch = self.get_patch(current) if current else None
-        if clean or current_patch is None or not os.path.isdir(self.current_path()):
-            self._clean()
-            current_patch = None
-
-        # compare (hash, path), not just hash. files move between patches
         wanted = self.pairs(tag, patch)
-        have = self.pairs(current, current_patch) if current_patch else set()
-        stale = sorted({rp for _, rp in have - wanted})
-        todo = sorted(wanted - have)
+        skip = {os.path.normcase(r) for r in skip}
+        skip = {r for _, r in wanted if _is_wad_path(r) and os.path.normcase(r) in skip}
 
-        if stale:
-            print(f'Removing {len(stale)} outdated files...')
-            for rel_path in stale:
-                full_path = self.current_path(rel_path)
-                if os.path.exists(full_path):
-                    os.chmod(full_path, stat.S_IWRITE)
-                    os.unlink(full_path)
+        current = self.current()
+        if clean:
+            self._clean()
+            current = None
+        elif current is not None and not os.path.isdir(self.current_path()):
+            current = None
+
+        if current != tag:
+            wad_bytes = sum(self._wad_size(h) for h, r in wanted if _is_wad_path(r) and r not in skip)
+            if current and self._park(current, wad_bytes):
+                current = None
+            if current is None and self._unpark(tag):
+                current = tag
+                print(f'Patch {tag} was kept ready.')
+
+        stubs = self.stubs() if current else set()
+        if current == tag:
+            # already here. fill in whatever's missing, and real files for placeholders that are needed now
+            todo = {(h, r) for h, r in wanted
+                    if (r in stubs and r not in skip) or not os.path.exists(self.current_path(r))}
+            if not todo:
+                print(f'Already on {tag}.')
+                return
+        else:
+            current_patch = self.get_patch(current) if current else None
+            if current_patch is None:
+                self._clean()
+                stubs = set()
+            # compare (hash, path), not just hash. files move between patches. placeholders never count
+            have = {(h, r) for h, r in self.pairs(current, current_patch) if r not in stubs} if current_patch else set()
+            stale = sorted({r for _, r in have - wanted} | stubs)
+            stubs = set()
+            todo = wanted - have
+            if stale:
+                print(f'Removing {len(stale)} outdated files...')
+                for rel_path in stale:
+                    full_path = self.current_path(rel_path)
+                    if os.path.exists(full_path):
+                        os.chmod(full_path, stat.S_IWRITE)
+                        os.unlink(full_path)
 
         # write None first so a crash mid-restore gets rebuilt next time
         _write_json_atomic(self.current_patch_path, None)
 
-        regular = [t for t in todo if not _is_wad_path(t[1])]
-        wads = [t for t in todo if _is_wad_path(t[1])]
+        regular = sorted(t for t in todo if not _is_wad_path(t[1]))
+        wads = sorted(t for t in todo if _is_wad_path(t[1]))
 
         if regular:
             print(f'Linking {len(regular)} files...')
             for item in track(regular, label='Linking files'):
                 self._restore_file(item)
 
-        if wads:
-            wads.sort(key=lambda x: os.path.getsize(os.path.join(self.files_dir, x[0])), reverse=True)
-            print(f'Building {len(wads)} WAD archives ({WORKERS} threads)...')
-            with ThreadPoolExecutor(max_workers=WORKERS) as executor:
-                futures = [executor.submit(self._build_wad, cs, self.current_path(rp)) for cs, rp in wads]
-                for future in track(as_completed(futures), total=len(futures), label='Building archives'):
-                    future.result()
+        placeholders = [t for t in wads if t[1] in skip]
+        wads = [t for t in wads if t[1] not in skip]
+        for _, rel in placeholders:
+            out = self.current_path(rel)
+            os.makedirs(os.path.dirname(out), exist_ok=True)
+            with open(out, 'wb') as f:
+                f.write(STUB_WAD)
+            stubs.add(rel)
+        if placeholders:
+            print(f'Quick start: {len(placeholders)} archives for champions not in this game left as placeholders.')
 
+        wads = self._link_from_kept(tag, wads, stubs)
+        if wads:
+            sizes = {h: self._wad_size(h) for h, _ in wads}
+            wads.sort(key=lambda x: sizes[x[0]], reverse=True)
+            total = sum(sizes.values())
+            print(f'Building {len(wads)} WAD archives, {total / 1024 ** 3:.1f} GB ({WORKERS} threads)...')
+            done = 0
+            step(0, total, 'Building archives')
+            with ThreadPoolExecutor(max_workers=WORKERS) as executor:
+                futures = {executor.submit(self._build_wad, cs, self.current_path(rp)): (cs, rp) for cs, rp in wads}
+                for future in as_completed(futures):
+                    future.result()
+                    cs, rp = futures[future]
+                    stubs.discard(rp)
+                    done += sizes[cs]
+                    step(done, total, 'Building archives')
+
+        self._save_stubs(stubs)
         _write_json_atomic(self.current_patch_path, tag)
+        # keep_prepared counts the current one
+        self._drop_kept(self.kept()[max(self.keep_prepared - 1, 0):])
         print(f'Restored patch {tag}!')
+
+    def _link_from_kept(self, tag, wads, stubs):
+        """identical archives in a kept patch get hard linked instead of rebuilt. returns what's left"""
+        have = {}
+        for other in self.kept():
+            if other == tag:
+                continue
+            other_stubs = self.stubs(other)
+            for h, r in self.pairs(other):
+                if _is_wad_path(r) and r not in other_stubs:
+                    have.setdefault((h, os.path.normcase(r)), self.kept_path(other, r))
+        left, linked = [], 0
+        for h, r in wads:
+            src = have.get((h, os.path.normcase(r)))
+            out = self.current_path(r)
+            if src and os.path.isfile(src):
+                try:
+                    os.makedirs(os.path.dirname(out), exist_ok=True)
+                    if os.path.exists(out):
+                        os.chmod(out, stat.S_IWRITE)
+                        os.unlink(out)
+                    os.link(src, out)
+                    stubs.discard(r)
+                    linked += 1
+                    continue
+                except OSError:
+                    pass
+            left.append((h, r))
+        if linked:
+            print(f'Reused {linked} archives from kept patches.')
+        return left
 
     def export(self, tag, destination):
         self.ensure_repo()
@@ -798,9 +960,10 @@ class LargeVCS:
                 raise ValueError(f'Need at least {MIN_FREE_BYTES // 1024 ** 3} GB free to optimize '
                                  f'(have {free / 1024 ** 3:.1f} GB).')
 
-            if os.path.isdir(self.current_path()):
-                log('Clearing the replay staging folder (it will be rebuilt when you next watch)...')
+            if os.path.isdir(self.current_path()) or self.kept():
+                log('Clearing prepared patches (they get rebuilt when you next watch)...')
                 self._clean()
+                self._drop_kept()
 
             tags = self.list()
             patches = {t: self.get_patch(t) for t in tags}
@@ -890,7 +1053,7 @@ class LargeVCS:
         with self.lock:
             self.packs.close()
             _pack_stores.pop(self.files_dir, None)
-            _delete_tree([self.repo_path(), self.current_path()], 'Deleting stored patches')
+            _delete_tree([self.repo_path(), self.current_path(), self.kept_path()], 'Deleting stored patches')
             try:
                 os.rmdir(self.root)  # only goes if it's empty
             except OSError:

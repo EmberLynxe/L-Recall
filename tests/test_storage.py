@@ -218,6 +218,80 @@ class DeleteTest(RepoTest):
         self.assertEqual((linking[0][0], linking[-1]), (0, (50, 50, 'Linking files')))
 
 
+class KeepReadyTest(RepoTest):
+    def setUp(self):
+        super().setUp()
+        self.repo.keep_prepared = 2
+        # make_wad signs with random bytes, so build the shared one once and copy the bytes
+        path = os.path.join(self.tmp, 'shared.wad.client')
+        make_wad(path, random_assets(10, seed=20), seed=20)
+        with open(path, 'rb') as f:
+            shared = f.read()
+        self.p1 = self.install('p1', {'a.dll': b'one', r'DATA\same.wad.client': shared,
+                                      r'DATA\FINAL\Champions\Ahri.wad.client': ('wad', random_assets(5, seed=21), 21),
+                                      r'DATA\FINAL\Champions\Zed.wad.client': ('wad', random_assets(5, seed=22), 22)})
+        self.p2 = self.install('p2', {'a.dll': b'two', r'DATA\same.wad.client': shared,
+                                      r'DATA\FINAL\Champions\Ahri.wad.client': ('wad', random_assets(5, seed=23), 23)})
+        self.repo.add(self.p1, 'P1')
+        self.repo.add(self.p2, 'P2')
+
+    def test_switching_back_is_a_rename(self):
+        self.repo.restore('P1')
+        self.repo.restore('P2')
+        self.assertStagedEqual(self.p2)
+        self.assertEqual(self.repo.kept(), ['P1'])
+        # identical archive came from the kept copy, same file on disk
+        self.assertGreater(os.stat(self.repo.current_path(r'DATA\same.wad.client')).st_nlink, 1)
+        with mock.patch('league_vcs.parsers.wad.pack_wad_exact', side_effect=AssertionError('rebuilt')):
+            self.repo.restore('P1')
+        self.assertStagedEqual(self.p1)
+        self.assertEqual(self.repo.kept(), ['P2'])
+
+    def test_only_keeps_as_many_as_asked(self):
+        p3 = self.install('p3', {'a.dll': b'three'})
+        self.repo.add(p3, 'P3')
+        for tag in ('P1', 'P2', 'P3'):
+            self.repo.restore(tag)
+        self.assertEqual(self.repo.kept(), ['P2'])
+        self.repo.keep_prepared = 1
+        self.repo.restore('P1')
+        self.assertEqual(self.repo.kept(), [])
+        self.assertStagedEqual(self.p1)
+
+    def test_dropping_a_patch_drops_its_kept_copy(self):
+        self.repo.restore('P1')
+        self.repo.restore('P2')
+        self.repo.drop('P1')
+        self.assertEqual(self.repo.kept(), [])
+        self.assertFalse(os.path.exists(self.repo.kept_path('P1')))
+
+    def test_quick_start_placeholders_get_filled_in_later(self):
+        zed = r'DATA\FINAL\Champions\Zed.wad.client'
+        self.repo.restore('P1', skip={zed})
+        with open(self.repo.current_path(zed), 'rb') as f:
+            self.assertEqual(f.read(), large_vcs.STUB_WAD)
+        self.assertEqual(self.repo.stubs(), {zed})
+        # same patch again, zed still not needed: nothing to do
+        self.repo.restore('P1', skip={zed})
+        self.assertEqual(self.repo.stubs(), {zed})
+        # a full prepare swaps the placeholder for the real thing
+        self.repo.restore('P1')
+        self.assertStagedEqual(self.p1)
+        self.assertEqual(self.repo.stubs(), set())
+        # and asking for quick start after that doesn't downgrade anything
+        self.repo.restore('P1', skip={zed})
+        self.assertStagedEqual(self.p1)
+
+    def test_placeholders_follow_a_kept_patch_around(self):
+        zed = r'DATA\FINAL\Champions\Zed.wad.client'
+        self.repo.restore('P1', skip={zed})
+        self.repo.restore('P2')
+        self.assertEqual(self.repo.stubs('P1'), {zed})
+        self.repo.restore('P1')
+        self.assertStagedEqual(self.p1)
+        self.assertEqual(self.repo.stubs(), set())
+
+
 class HostileStorageTest(RepoTest):
     """storage folders from someone else. none of this should touch anything outside the repo"""
 
