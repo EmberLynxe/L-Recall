@@ -186,8 +186,8 @@ def needs_vanguard(version):
 def vanguard_preflight(version, warn_old=True):
     """(level, message), or (None, None) if we're good.
 
-    14.9+ won't start without vanguard. older ones don't need it, and running them with
-    vanguard on is untested, so we can warn about that"""
+    14.9+ won't start without vanguard. with pre-check off it's always on and blocks replays.
+    older patches don't need it, and running them with it on is untested"""
     from league_vcs import vanguard
     st = vanguard.status()
     new = needs_vanguard(version)
@@ -197,22 +197,11 @@ def vanguard_preflight(version, warn_old=True):
                              'Install it from the Riot Client, restart, then try again.')
         return None, None
     if st['running'] and st['mode'] == 'boot':
-        # loaded before the game starts, so it refuses copies the riot client didn't launch
-        if not new:
-            return 'warn', ('Riot Vanguard is running and starts with Windows on this PC, so it will block this '
-                            'replay. Exit Vanguard from its tray icon first, then watch. You\'ll need to restart '
-                            'your PC before you can play League again.')
-        msg = (f'Riot Vanguard starts with Windows on this PC, so it will block this replay. Patch {version} '
-               'also needs Vanguard, so exiting it won\'t help either. Replays from 14.9 on only play in L-Recall '
-               'with Vanguard\'s Pre-Check turned on.')
-        if installed_version() == version:
-            msg += ' This one\'s on the patch you have installed, so you can watch it from the League client.'
-        return 'warn', msg
+        return 'warn', PRECHECK_OFF + ' Turn on Pre-Check to watch replays.' + _other_options(version)
     if new and not st['running']:
         if st['mode'] == 'on_demand':
-            # pre-check: it starts with a riot game, so not running yet is normal
-            return 'warn', (f'Patch {version} needs Riot Vanguard, which isn\'t running right now. '
-                            'If the replay doesn\'t open, start League from the Riot Client first, then try again.')
+            # pre-check switches it on and off by itself. not running yet is how it's meant to be
+            return None, None
         if st['mode'] == 'disabled':
             return 'block', (f'Patch {version} needs Riot Vanguard, but it\'s disabled. '
                              'Repair or reinstall it from the Riot Client, restart, then try again.')
@@ -256,6 +245,20 @@ def watch(replay, before_launch=None):
     p.wait()
 
 
+PRECHECK_OFF = ('Vanguard Pre-Check is off on this PC, so Vanguard is always on, and that blocks replays '
+                'L-Recall opens.')
+
+
+def _other_options(version):
+    if installed_version() == version:
+        return ' This one\'s on the patch you have installed, so you can watch it from the League client instead.'
+    if not needs_vanguard(version):
+        # nobody's checked this one properly yet, so don't promise anything
+        return (f' Patch {version} is from before Vanguard, so exiting Vanguard from its tray icon might let it play. '
+                'That\'s untested. You\'d need to restart your PC before playing League again.')
+    return ''
+
+
 def installed_version():
     live = detect_game_exe()
     try:
@@ -272,17 +275,11 @@ def launch_refused(version):
     if not st['running']:
         return (f'Windows wouldn\'t start patch {version} (access denied). Antivirus is the usual '
                 'suspect, check whether it blocked League of Legends.exe in the storage folder.')
-    msg = (f'Windows wouldn\'t start patch {version}. Riot Vanguard is running and blocked it, '
-           'which it does to game copies the Riot Client didn\'t start. L-Recall won\'t try to get around that.')
-    if installed_version() == version:
-        return msg + ' This replay is on the patch you have installed, so open it from the League client instead.'
-    if not needs_vanguard(version):
-        return msg + (' This patch is from before Vanguard, so you can exit Vanguard from its tray icon '
-                      '(it comes back when you restart your PC) and try again.')
+    msg = (f'Windows wouldn\'t start patch {version}. Riot Vanguard blocked it, and L-Recall won\'t try to '
+           'get around that.')
     if st['mode'] == 'boot':
-        return msg + (' Vanguard is set to start with Windows on this PC. Replays on 14.9 and newer only play '
-                      'here when Vanguard is in Pre-Check mode, where it starts with a Riot game instead.')
-    return msg
+        msg += ' ' + PRECHECK_OFF + ' Turn on Pre-Check to watch replays.'
+    return msg + _other_options(version)
 
 
 def list_replays(folders):

@@ -183,11 +183,9 @@ class VanguardCheckTest(unittest.TestCase):
         with mock.patch.object(vanguard, 'status', return_value=self.status(running=False)):
             self.assertEqual(core.vanguard_preflight('16.19.1')[0], 'block')
 
-    def test_pre_check_not_running_yet_is_only_a_warning(self):
+    def test_pre_check_not_running_yet_is_fine(self):
         with mock.patch.object(vanguard, 'status', return_value=self.status(running=False, mode='on_demand')):
-            level, message = core.vanguard_preflight('16.19.1')
-            self.assertEqual(level, 'warn')
-            self.assertIn('Riot Client', message)
+            self.assertEqual(core.vanguard_preflight('16.19.1'), (None, None))
 
     def test_nothing_in_here_changes_vanguard(self):
         # vanguard stays read only
@@ -201,8 +199,9 @@ class VanguardCheckTest(unittest.TestCase):
 
     def test_blocked_launch_says_why(self):
         self.assertIn('Pre-Check', self.refused('16.10.1', live='16.19.1'))
+        self.assertNotIn('tray icon', self.refused('16.10.1', live='16.19.1'))
         self.assertIn('League client', self.refused('16.19.1', live='16.19.1'))
-        self.assertIn('tray icon', self.refused('14.1.1'))
+        self.assertIn('untested', self.refused('14.1.1'))
         self.assertIn('Antivirus', self.refused('16.10.1', running=False))
 
     def test_vanguard_from_boot_always_warns(self):
@@ -210,7 +209,7 @@ class VanguardCheckTest(unittest.TestCase):
                 mock.patch.object(core, 'installed_version', return_value='16.19.1'):
             level, message = core.vanguard_preflight('14.1.1', warn_old=False)
             self.assertEqual(level, 'warn')
-            self.assertIn('Exit Vanguard', message)
+            self.assertIn('untested', message)
             level, message = core.vanguard_preflight('16.10.1')
             self.assertIn('Pre-Check', message)
             self.assertNotIn('League client', message)

@@ -50,7 +50,7 @@ For example, 4 patches back to back of the past year (16.19-16.15), should stay 
 Replays are the `.rofl` files you get from the download button in match history.
 
 > [!WARNING]
-> **Turn on Riot Vanguard [Pre-Check](https://support.riotgames.com/en-us/riot/performance/vanguard-pre-check) if you can.** It's highly recommended. If Vanguard starts with Windows instead, it blocks the replays L-Recall opens. The only other option is exiting Vanguard from its tray icon before watching, then restarting your PC before you play again, and that only works for patches before 14.9. See [Vanguard](#vanguard).
+> **It's highly recommended to turn on Riot Vanguard [Pre-Check](https://support.riotgames.com/en-us/riot/performance/vanguard-pre-check).** Pre-Check switches Vanguard on and off by itself. With it off, Vanguard is always on and blocks replay playback. See [Vanguard](#vanguard).
 
 > [!IMPORTANT]
 > It can only save patches you actually had installed. If a patch was never on your PC, replays from it can't be played. The Patches tab shows which patches your replays need that you don't have yet, so start it early.
@@ -61,9 +61,9 @@ Replays are the `.rofl` files you get from the download button in match history.
 
 L-Recall starts Riot's own game client with the replay file, the same way the client does when you hit watch. It checks whether Vanguard is running so it can warn you, but it never starts, stops or changes it.
 
-- Replays from 14.9 on need Vanguard running (that's when it came out). Older ones don't.
-- **Pre-Check on:** Vanguard only runs while a Riot game is open, and everything plays. If a newer replay won't open, start League from the Riot Client first.
-- **Vanguard starts with Windows:** it blocks game copies the Riot Client didn't start, so L-Recall warns you before watching. For replays before 14.9, exit Vanguard from its tray icon ([Riot's FAQ](https://support.riotgames.com/en-us/league-of-legends/performance/riot-vanguard-faq-league-of-legends)), watch, then restart your PC before playing again. Replays from 14.9 on won't play this way. If one's on the patch you have installed, watch it from the League client instead.
+- **Pre-Check on:** Vanguard switches itself on and off, and replays play.
+- **Pre-Check off:** Vanguard is always on and blocks replays, so L-Recall warns you before watching. Replays on the patch you have installed can still be watched from the League client.
+- **Patches before 14.9** came out before Vanguard. Exiting Vanguard from its tray icon ([Riot's FAQ](https://support.riotgames.com/en-us/league-of-legends/performance/riot-vanguard-faq-league-of-legends)) might let those play without Pre-Check, but that's untested, and you'd need to restart before playing League again.
 - L-Recall never tries to get past Vanguard. If it blocks something, that's the end of it.
 
 ## Things to know

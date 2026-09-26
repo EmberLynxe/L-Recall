@@ -542,10 +542,10 @@ tr.me .pl-n { color: var(--accent); }
           </div>
         </div>
         <div class="frow">
-          <div><h3>Riot Vanguard</h3><p>Replays from patch 14.9 on need Vanguard running. Older patches play without it. Pre-Check is strongly recommended.</p></div>
+          <div><h3>Riot Vanguard</h3><p>Pre-Check is strongly recommended. It switches Vanguard on and off by itself. With it off, Vanguard is always on and blocks replays.</p></div>
           <div>
             <div class="cache-info" id="vg-info">...</div>
-            <p class="legal" style="margin-top:0">L-Recall only reads Vanguard's status, it never changes it. If Vanguard starts with Windows, it blocks replays. Old patches (before 14.9) can still play if you exit Vanguard from its tray icon, then restart before playing again. Newer ones need Pre-Check.</p>
+            <p class="legal" style="margin-top:0">L-Recall only reads Vanguard's status. It never changes it or tries to get around it.</p>
             <div class="inl" style="margin-top:8px"><button class="btn" onclick="openLink('https://support.riotgames.com/en-us/league-of-legends/performance/riot-vanguard-faq-league-of-legends')">Riot's Vanguard FAQ</button></div>
             <label class="check"><input type="checkbox" id="vg-warn" onchange="vgWarn(this.checked)"> Warn before watching pre-Vanguard replays while Vanguard is on</label>
           </div>
@@ -1556,8 +1556,8 @@ async function loadSettings() {
 function vgText(v) {
   if (!v.installed) return 'Not installed.';
   const state = v.running ? '<b>Running</b>' : '<b>Not running</b>';
-  if (v.mode === 'boot') return state + ' · starts with Windows. <span style="color:var(--loss)">This blocks replays, turn on Pre-Check if you can.</span>';
-  if (v.mode === 'on_demand') return state + ' · starts when a Riot game does (Pre-Check)';
+  if (v.mode === 'boot') return state + ' · always on, Pre-Check is off. <span style="color:var(--loss)">This blocks replays, turn on Pre-Check.</span>';
+  if (v.mode === 'on_demand') return state + ' · Pre-Check on, switches itself on and off';
   if (v.mode === 'disabled') return state + ' · disabled, repair it from the Riot Client';
   return state;
 }
