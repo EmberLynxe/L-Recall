@@ -17,13 +17,13 @@
 
   --t1: #e6e8eb;
   --t2: #a3abb5;
-  --t3: #6a7480;
+  --t3: #8a94a0;  /* was #6a7480, 3.3:1 on the win/loss rows. this is 5:1+ everywhere */
 
   --gold: #c8aa6e;
-  --win: #4d8fe8;
+  --win: #5b9bf0;
   --win-row: #14203a;
   --win-row-h: #192845;
-  --loss: #e3545e;
+  --loss: #ef6670;
   --loss-row: #2a181d;
   --loss-row-h: #331d23;
   --flat-row: #141a22;
@@ -133,7 +133,7 @@ a { color: inherit; }
 .sub b { font-weight: 600; color: var(--t2); }
 .side { text-align: right; font-size: 11.5px; line-height: 1.55; white-space: nowrap; }
 .side .tm { color: var(--t2); }
-.side .pt { color: var(--t3); }
+.side .pt { color: var(--t2); }
 .nostore { color: var(--t3); border: 1px solid var(--line2); border-radius: 2px; padding: 0 4px; font-size: 10.5px; margin-left: 4px; }
 .row.plain { grid-template-columns: 58px minmax(0,1fr) auto; }
 .row.me { grid-template-columns: 58px 44px minmax(0,1fr) auto auto; }
@@ -693,14 +693,20 @@ let assetBase = '', ddVersions = [];
 const ckey = c => CHAMP_FIX[c] || c;
 function verFor(patch) { return ddVersions.find(v => v === patch || v.startsWith(patch + '.')) || ddVersions[0] || ''; }
 const latest = () => ddVersions[0] || '';
+// on disk first. an older patch that isn't cached yet borrows the newest cached icon, which is
+// nearly always the same picture and loads instantly. the cdn is the last resort
 function imgTag(kind, name, ver, attrs = '') {
   if (!ver || !name) return '';
   const cdn = CDN + ver + '/img/' + kind + '/' + name + '.png';
-  const src = assetBase ? assetBase + ver + '/' + kind + '/' + name + '.png' : cdn;
-  return '<img ' + attrs + ' src="' + esc(src) + '"' + (assetBase ? ' data-cdn="' + esc(cdn) + '"' : '') + ' onerror="imgFail(this)">';
+  const local = v => assetBase + v + '/' + kind + '/' + name + '.png';
+  const src = assetBase ? local(ver) : cdn;
+  const fb = assetBase ? [ver !== latest() && latest() ? local(latest()) : '', cdn].filter(Boolean).join('|') : '';
+  return '<img ' + attrs + ' src="' + esc(src) + '"' + (fb ? ' data-fb="' + esc(fb) + '"' : '') +
+    ' loading="lazy" decoding="async" onerror="imgFail(this)">';
 }
 function imgFail(el) {
-  if (el.dataset.cdn) { const u = el.dataset.cdn; el.removeAttribute('data-cdn'); el.src = u; }
+  const fb = (el.dataset.fb || '').split('|').filter(Boolean);
+  if (fb.length) { el.dataset.fb = fb.slice(1).join('|'); el.src = fb[0]; }
   else el.remove();
 }
 function champIcon(c, ver) {
@@ -955,7 +961,7 @@ function runeImg(id, cls = '') {
   if (!info) return '';
   const cdn = 'https://ddragon.leagueoflegends.com/cdn/img/' + info.icon;
   const src = assetBase ? assetBase + 'img/' + info.icon : cdn;
-  return '<img ' + cls + ' src="' + esc(src) + '"' + (assetBase ? ' data-cdn="' + esc(cdn) + '"' : '') + ' title="' + esc(info.name) + '" onerror="imgFail(this)">';
+  return '<img ' + cls + ' src="' + esc(src) + '"' + (assetBase ? ' data-fb="' + esc(cdn) + '"' : '') + ' title="' + esc(info.name) + '" decoding="async" onerror="imgFail(this)">';
 }
 
 function renderEmptyDetail() {
@@ -976,7 +982,8 @@ async function openDetail(i) {
     if (detPath !== r.path) return;
     const ver = verFor(r.patch);
     const all = [...(d.blue_team || []), ...(d.red_team || [])];
-    const want = call('ensure_assets', {
+    // cache this game's icons for next time. not waited on, it used to hold the whole page for up to 0.9s
+    call('ensure_assets', {
       version: ver,
       champions: all.map(p => ckey(p.champion)),
       items: all.flatMap(p => p.items || []).filter(Boolean),
@@ -984,9 +991,6 @@ async function openDetail(i) {
     }).catch(() => {});
     const runeIds = [...new Set(all.flatMap(p => p.runes ? [...p.runes.perks, p.runes.primary, p.runes.secondary] : []).filter(Boolean))];
     const runesP = runeIds.length ? call('get_runes', { version: ver, ids: runeIds }).catch(() => ({})) : Promise.resolve({});
-    const timeout = new Promise(res => setTimeout(res, 900));
-    await Promise.race([Promise.all([want, runesP]), timeout]);
-    if (detPath !== r.path) return;
     const me = all.findIndex(isMe);
     cur = { r, d, ver, all, runes: {}, tab: cur ? cur.tab : 'score', sel: me >= 0 ? me : 0, noteOpen: false };
     renderDetail();
@@ -1124,7 +1128,7 @@ function boardHTML(r, d) {
       const sp = (p.summoner_spells || []).map(id => SPELLS[id] ? imgTag('spell', SPELLS[id], ver) : '<span></span>').join('');
       const it = p.items || [];
       let items = '';
-      for (let s = 0; s < 6; s++) items += it[s] ? imgTag('item', it[s], ver, 'loading="lazy"') : '<span></span>';
+      for (let s = 0; s < 6; s++) items += it[s] ? imgTag('item', it[s], ver) : '<span></span>';
       items += it[6] ? imgTag('item', it[6], ver, 'class="trk"') : '<span class="trk"></span>';
       const rn = p.runes || {};
       const runes = '<div class="runes-mini">' + (runeImg(rn.perks && rn.perks[0]) || '<span></span>') + (runeImg(rn.secondary) || '<span></span>') + '</div>';
