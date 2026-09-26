@@ -18,15 +18,15 @@ except Exception:
             pass
 
 import win32api
-import win32com.client
 import win32process
 import wx
 
 from .frames import WatchReplayFrame, InitialConfigFrame, SettingsFrame
 from .tray_item import TrayItem
-from .. import core, updates, winproc
+from .. import __version__, core, updates, winproc
 from ..config import Config
 from ..exceptions import UserInputException
+from large_vcs.progress import Cancelled, reporting
 
 
 class GUI:
@@ -57,11 +57,27 @@ class GUI:
     def set_priority(self, priority):
         win32process.SetPriorityClass(self.process_handle, priority)
 
+    # windows background mode: lowest cpu, disk and memory priority there is. with the window shut
+    # l-recall should never be the reason a game hitches, so it always loses to anything else
+    BACKGROUND_BEGIN, BACKGROUND_END = 0x00100000, 0x00200000
+
     def set_low_priority(self):
-        self.set_priority(win32process.IDLE_PRIORITY_CLASS)
+        try:
+            win32process.SetPriorityClass(self.process_handle, self.BACKGROUND_BEGIN)
+        except Exception:
+            # already in background mode, or an old windows. idle priority is the next best thing
+            try:
+                self.set_priority(win32process.IDLE_PRIORITY_CLASS)
+            except Exception:
+                pass
 
     def set_high_priority(self):
-        self.set_priority(win32process.ABOVE_NORMAL_PRIORITY_CLASS)
+        try:
+            win32process.SetPriorityClass(self.process_handle, self.BACKGROUND_END)
+        except Exception:
+            pass
+        # normal, not above normal. the window being open shouldn't beat a game either
+        self.set_priority(win32process.NORMAL_PRIORITY_CLASS)
 
     def start(self, show_window=True):
         if self.config['configured']:
@@ -97,7 +113,7 @@ class GUI:
                 self.config.save()
         self.install_startup()
         self.set_low_priority()
-        self.tray_icon = TrayItem([], on_click=self.open_settings)
+        self.tray_icon = TrayItem([], on_click=self.open_settings, subtitle=f'v{__version__}', status=self.tray_status)
         self.update_tray_menu()
         self.auto_scan_loop()
         self.update_check_loop()
@@ -105,6 +121,7 @@ class GUI:
     def install_startup(self):
         if not getattr(sys, 'frozen', False):
             return
+        import win32com.client  # 7 mb for one shortcut, so only load it here
         shell = win32com.client.Dispatch('WScript.Shell')
         startup_path = shell.SpecialFolders('Startup')
         path = os.path.join(startup_path, 'L-Recall.lnk')
@@ -124,19 +141,35 @@ class GUI:
         shortcut.save()
 
     def update_tray_menu(self):
-        scan_option = ('Scanning...', None) if self.scan_lock.locked() else ('Scan Now', self.scan_game_directories)
-        update_option = ((f"Update to {self.update_info['version']}", self.open_update), None) \
+        # (label, action, icon, highlighted). no action = greyed out
+        scan_option = ('Checking for new patches', None, 'scan') if self.scan_lock.locked() \
+            else ('Check for new patches', self.scan_game_directories, 'scan')
+        update_option = ((f"Update to {self.update_info['version']}", self.open_update, 'update', True), None) \
             if self.update_info else ()
         tray_menu = (
             *update_option,
-            ('Browse Replays', self.open_settings),
-            ('Watch Replay...', self.open_replay_picker),
+            ('Browse replays', self.open_settings, 'replays'),
+            ('Watch a replay file...', self.open_replay_picker, 'watch'),
             scan_option,
             None,
-            ('Settings', self.open_settings),
-            ('Exit', self.ask_exit)
+            ('Settings', self.open_settings, 'settings'),
+            ('Exit', self.ask_exit, 'exit'),
         )
         self.tray_icon.menu_options = tray_menu
+
+    def tray_status(self):
+        """one line under the name in the tray menu. cheap, it runs every time the menu opens"""
+        if self.scan_lock.locked():
+            return 'Checking for new patches...'
+        repo = core.repo
+        if repo is None:
+            return None
+        try:
+            stored, ready = len(repo.list()), repo.current()
+        except Exception:
+            return None
+        text = f"{stored} patch{'es' if stored != 1 else ''} stored"
+        return text + (f' · {ready} ready' if ready else '')
 
     def auto_scan_loop(self):
         threading.Thread(target=self._scan_game_directories, daemon=True, args=(False,)).start()
@@ -151,8 +184,10 @@ class GUI:
         release = updates.newer_than_running()
         self.update_info = release
         wx.CallAfter(self.update_tray_menu)
-        # one balloon per version, and none for a version they already said no to
-        if release and release['version'] not in (self._told_about, self.config.get('dismissed_update')):
+        # one balloon per version, none for a version they already said no to, and none mid-game.
+        # the tray menu still has it, and the next check can say it
+        if release and release['version'] not in (self._told_about, self.config.get('dismissed_update')) \
+                and not winproc.game_running():
             self._told_about = release['version']
             wx.CallAfter(self.tray_icon.ShowBalloon,
                          title=f"L-Recall {release['version']} is out",
@@ -243,6 +278,21 @@ class GUI:
     def _on_settings_closed(self):
         self.settings_frame = None
         self.set_low_priority()
+        # the window and its webview are gone, give the memory back. a bit later so the webview's
+        # really torn down first
+        wx.CallLater(3000, winproc.trim_memory)
+
+    def _stop_when_game_starts(self):
+        """an event that gets set if league starts while we're storing. storing reads the whole game
+        folder, so the moment a game starts it stops and picks up again on the next check"""
+        stop, done = threading.Event(), self.scan_lock
+
+        def watch():
+            while not stop.wait(3) and done.locked():
+                if winproc.game_running():
+                    stop.set()
+        threading.Thread(target=watch, daemon=True).start()
+        return stop
 
     def scan_game_directories(self, *_):
         threading.Thread(target=self._scan_game_directories, daemon=True, args=(True,)).start()
@@ -262,7 +312,7 @@ class GUI:
                              text='Try again in a bit.')
             return
 
-        with self.scan_lock:
+        with self.scan_lock, reporting(None, self._stop_when_game_starts()):
             wx.CallAfter(self.update_tray_menu)
 
             try:
@@ -289,6 +339,9 @@ class GUI:
                 elif not is_new:
                     try:
                         core.top_up(os.path.dirname(game_path))
+                    except Cancelled:
+                        print(f'Top-up of {version} stopped, a game started. Next check carries on.')
+                        break
                     except Exception as e:
                         print(f'Top-up of {version} failed: {e}')
 
@@ -303,7 +356,11 @@ class GUI:
 
             for game_path, version in to_update:
                 try:
-                    core.add(os.path.dirname(game_path))
+                    # half the cores. storing in the background shouldn't max out the pc
+                    core.add(os.path.dirname(game_path), workers=max(2, (os.cpu_count() or 4) // 2))
+                except Cancelled:
+                    print(f'Stopped storing {version}, a game started. Next check carries on.')
+                    break
                 except UserInputException as e:
                     print(f'Skipped {version}: {e}')  # still updating, or changed mid-copy. next scan retries
                     continue
@@ -316,3 +373,4 @@ class GUI:
                              text='Replays from this patch can now be watched.')
 
         wx.CallAfter(self.update_tray_menu)
+        winproc.trim_memory()

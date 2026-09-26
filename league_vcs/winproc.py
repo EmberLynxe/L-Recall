@@ -50,3 +50,16 @@ def process_names():
 
 def game_running():
     return GAME_EXE in process_names()
+
+
+def trim_memory():
+    """hand unused memory back to windows. called when the window closes and after big jobs, so
+    sitting in the tray doesn't keep whatever the last job needed"""
+    import gc
+    gc.collect()
+    try:
+        _k32.GetCurrentProcess.restype = wintypes.HANDLE
+        _k32.SetProcessWorkingSetSize.argtypes = [wintypes.HANDLE, ctypes.c_size_t, ctypes.c_size_t]
+        _k32.SetProcessWorkingSetSize(_k32.GetCurrentProcess(), ctypes.c_size_t(-1), ctypes.c_size_t(-1))
+    except Exception:
+        pass
