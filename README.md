@@ -31,6 +31,7 @@ L-Recall is a tool designed to automatically archive your patches as Riot update
 
 > [!WARNING]
 > It is absolutely HIGHLY RECOMMENDED, that you turn on Vanguard's [Pre-Check](https://support.riotgames.com/en-us/riot/performance/vanguard-pre-check) if you can. Without it Vanguard stays on all the time and blocks replays from opening, so you'd have to exit it from its tray icon before watching, then restart your PC before you play League again. L-Recall never touches Vanguard itself. Otherwise, you will have to resort to manually exiting the Vanguard process via the right clicking it's icon in the taskbar tray; with a restart being necessary should you want to play a Riot Game afterwards.
+> Pre-Check is what allows Vanguard to safely turn off when a Riot Game is not detected as running, therefore allowing L-Recall to use the LoL.exe to play the ROFL files.
 
 ## Getting started
 
