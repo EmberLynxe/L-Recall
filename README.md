@@ -1,13 +1,29 @@
-# L-Recall
+<p align="center">
+  <img src="raster/icon.png" width="128" alt="L-Recall logo">
+</p>
 
-[![Build](https://img.shields.io/github/actions/workflow/status/EmberLynxe/L-Recall/release.yml?style=flat-square&label=build)](https://github.com/EmberLynxe/L-Recall/actions/workflows/release.yml)
-[![License](https://img.shields.io/github/license/EmberLynxe/L-Recall?style=flat-square)](LICENSE)
-[![Downloads](https://img.shields.io/github/downloads/EmberLynxe/L-Recall/total?style=flat-square)](https://github.com/EmberLynxe/L-Recall/releases/latest)
-[![Ko-fi](https://img.shields.io/badge/ko--fi-support%20me-green?logo=ko-fi&style=flat-square)](https://ko-fi.com/emberlynx_)
+<h1 align="center">L-Recall</h1>
 
-Watch your old League replays on the patch they were actually played on.
+<p align="center">Watch your old League replays on the patch they were actually played on.</p>
 
-![L-Recall in use](images/demo.gif)
+<p align="center">
+  <a href="https://github.com/EmberLynxe/L-Recall/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/EmberLynxe/L-Recall/release.yml?style=flat-square&label=build" alt="Build"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/EmberLynxe/L-Recall?style=flat-square" alt="License"></a>
+  <a href="https://github.com/EmberLynxe/L-Recall/releases/latest"><img src="https://img.shields.io/github/downloads/EmberLynxe/L-Recall/total?style=flat-square" alt="Downloads"></a>
+  <a href="https://ko-fi.com/emberlynx_"><img src="https://img.shields.io/badge/ko--fi-support%20me-green?logo=ko-fi&style=flat-square" alt="Ko-fi"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/EmberLynxe/L-Recall/releases/latest"><b>Download for Windows</b></a>
+  &nbsp;&middot;&nbsp;
+  <a href="#getting-started">Getting started</a>
+  &nbsp;&middot;&nbsp;
+  <a href="#need-help">Need help?</a>
+</p>
+
+<p align="center">
+  <img src="images/demo.gif" alt="L-Recall in use">
+</p>
 
 League only plays replays from the current patch, so every update your old ones stop working. L-Recall keeps a copy of each patch you've had installed and opens old replays with the right one. It's also a replay browser, with the full scoreboard and stats for every game.
 
@@ -24,6 +40,8 @@ The first time you run it, Windows might say it protected your PC, because L-Rec
 
 It can only save patches that were actually on your PC, so the sooner it's running the better.
 
+## How much space it takes
+
 Patches share most of their files, and anything that's the same between them is only saved once. So how much space it takes depends on how far apart your patches are:
 
 - The first patch is the big one, around 21 to 24 GB.
@@ -38,7 +56,7 @@ The game files belong to Riot, so I can't share old patches, and please don't sh
 
 ## Need help?
 
-Check the [issues](https://github.com/EmberLynxe/L-Recall/issues) or open a new one. If something went wrong, the files in the `logs` folder next to `L-Recall.exe` help a lot.
+Check the [issues](https://github.com/EmberLynxe/L-Recall/issues) or open a new one. If something went wrong, **Save a problem report** at the bottom of Settings zips your last few logs into your Downloads folder, with your username taken out. Attaching that helps a lot.
 
 ## Building from source
 
@@ -64,4 +82,4 @@ Releases are built by GitHub Actions from tagged commits in this repo, never upl
 
 Riot's [Data Dragon](https://developer.riotgames.com/docs/lol#data-dragon) for the champion, item and rune icons.
 
-L-Recall isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.
+<sub>L-Recall isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.</sub>
