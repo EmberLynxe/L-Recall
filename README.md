@@ -4,7 +4,7 @@
 
 <h1 align="center">L-Recall</h1>
 
-<p align="center">Watch your old League replays on the patch they were actually played on.</p>
+<p align="center">A tool that sorts your old Client Patches, and the means to watch older ROFL/Game Replays.</p>
 
 <p align="center">
   <a href="https://github.com/EmberLynxe/L-Recall/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/EmberLynxe/L-Recall/release.yml?style=flat-square&label=build" alt="Build"></a>
@@ -25,10 +25,12 @@
   <img src="images/demo.gif" alt="L-Recall in use">
 </p>
 
-League only plays replays from the current patch, so every update your old ones stop working. L-Recall keeps a copy of each patch you've had installed and opens old replays with the right one. It's also a replay browser, with the full scoreboard and stats for every game.
+The native League client is only able to play ROFL files from the same patch (Not including hotfixes iirc...), which means older replays from patches yonks ago dont work anymore... which is where this tool comes in to help.
+
+L-Recall is a tool designed to automatically archive your patches as Riot updates them, allowing you to play older replays dynamically, depending on what patch is necessary to play them to begin with. It also happens to be great at sorting that messy replay folder of yours in a nice little program :)
 
 > [!WARNING]
-> Turn on Vanguard's [Pre-Check](https://support.riotgames.com/en-us/riot/performance/vanguard-pre-check) if you can. Without it Vanguard stays on all the time and blocks replays from opening, so you'd have to exit it from its tray icon before watching, then restart your PC before you play League again. L-Recall never touches Vanguard itself.
+> It is absolutely HIGHLY RECOMMENDED, that you turn on Vanguard's [Pre-Check](https://support.riotgames.com/en-us/riot/performance/vanguard-pre-check) if you can. Without it Vanguard stays on all the time and blocks replays from opening, so you'd have to exit it from its tray icon before watching, then restart your PC before you play League again. L-Recall never touches Vanguard itself. Otherwise, you will have to resort to manually exiting the Vanguard process via the right clicking it's icon in the taskbar tray; with a restart being necessary should you want to play a Riot Game afterwards.
 
 ## Getting started
 
@@ -44,13 +46,15 @@ It can only save patches that were actually on your PC, so the sooner it's runni
 
 Patches share most of their files, and anything that's the same between them is only saved once. So how much space it takes depends on how far apart your patches are:
 
-- The first patch is the big one, around 21 to 24 GB.
+- A fully loaded native patch comes in around 20-28GB, this includes everything from the client itself, maps, champions, ALL of it
 - The next patch usually only adds somewhere between 80 and 450 MB, depending on how much it changes. On my PC, 16.19 added 430 MB on top of 16.18, and a 16.19 hotfix added 81 MB.
 - Patches further apart share less. 15.14 next to 16.18 is about 13 GB extra, most of it champion files that changed over the year, plus the maps.
 
-To actually watch something, its patch has to be built and ready on top of the storage. By default only the champions and map in the replay get built, so that's around 6 GB for a Summoner's Rift game and a bit over 4 GB for ARAM or Arena, instead of a full 30 GB copy of the game. Only one patch is kept ready, and watching a replay from another patch updates it in place. You can turn that off or keep more patches ready in Settings, but each one takes a lot more space. If you'd rather not have anything sitting there between sessions, Clear ready files on the Patches tab gets that space back, or Settings can do it every time L-Recall closes.
+To actually watch something, its patch has to be built and ready on top of the storage. By default only the champions and map in the replay get built, so that's around 6 GB for a Summoner's Rift game and a bit over 4 GB for ARAM or Arena, instead of a full 30 GB copy of the game. This is done by parsing the ROFL file for Champion data etc, and then telling the tool to ONLY load those Champions and other necessary files for that ROFL to load successfully. Please note that this feature is highly experimental and don't be surprised if this causes crashes or other weird issues with the tool. (If there are issues, the tool will automatically load the entire patch)
 
-It works out whether your storage is on an NVMe SSD, a SATA SSD or a hard drive, and builds patches the way that suits it. It's fastest on an NVMe, but a hard drive works fine too, especially after running Rearrange storage in Settings.
+Only one patch is kept ready, and watching a replay from another patch updates it in place. You can turn that off or keep more patches ready in Settings, but each one takes a lot more space. If you'd rather not have anything sitting there between sessions, Clear ready files on the Patches tab gets that space back, or Settings can do it every time L-Recall closes.
+
+It works out whether your storage is on an NVMe SSD, a SATA SSD or a hard drive, and builds patches the way that suits it. It's fastest on an NVMe, but a hard drive works fine too, especially after running Rearrange storage in Settings. However I highly recommend that this tool is used on SSD's only, as to take advantage of higher speeds, file multitasking, as this tool does a LOT of unpacking and repacking files.
 
 The game files belong to Riot, so I can't share old patches, and please don't share your storage folder either.
 
