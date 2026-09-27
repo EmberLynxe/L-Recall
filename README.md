@@ -58,6 +58,8 @@ It works out whether your storage is on an NVMe SSD, a SATA SSD or a hard drive,
 
 The game files belong to Riot, so I can't share old patches, and please don't share your storage folder either.
 
+Logo is taken from League VCS, and edited to be a dark Amber; idk, to represent Zhonya's stasis for patches :D
+
 ## Need help?
 
 Check the [issues](https://github.com/EmberLynxe/L-Recall/issues) or open a new one. If something went wrong, **Save a problem report** at the bottom of Settings zips your last few logs into your Downloads folder, with your username taken out. Attaching that helps a lot.
