@@ -38,9 +38,16 @@ L-Recall is a tool designed to automatically archive your patches as Riot update
 
 1. Download the zip from [releases](https://github.com/EmberLynxe/L-Recall/releases/latest) and unzip it somewhere, a folder on your desktop is fine.
 2. Run `L-Recall.exe`. It finds League on its own, and your replays too if they're in the usual Documents folder. You just pick where the patches get saved.
-3. Leave it running in the tray. It saves each new patch after League updates.
+3. Leave it running in the tray. Straight after setup it saves the patch you have installed (about 20 GB, a few minutes), and after that it saves each new patch once League updates. You can see how it's going on the Patches tab.
 
 The first time you run it, Windows might say it protected your PC, because L-Recall isn't code signed yet (that costs money or needs a bigger project). Click **More info**, then **Run anyway**. The whole source is right here, and every release is built straight from it by GitHub.
+
+## How patches get saved
+
+L-Recall doesn't download anything from Riot. It saves a patch by copying the game files from a League install on your PC into its own storage, and only replays from a saved patch can be played. There are two ways a patch gets in there:
+
+- **League updates.** L-Recall checks your install every hour, and once Riot's finished updating it saves the new patch in the background. This is on by default. You can turn it off at setup or in Settings, and then patches only get saved when you hit **Save it now** on the Patches tab.
+- **You add one yourself.** If you've got the Game folder from an older League install (an old backup, another PC, or an older client you've unzipped), go to the Patches tab, click **Add from install...** and pick `League of Legends.exe` inside that folder. Once it's done you can delete that folder, L-Recall keeps everything it needs.
 
 It can only save patches that were actually on your PC, so the sooner it's running the better.
 
