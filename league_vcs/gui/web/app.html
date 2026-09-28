@@ -314,6 +314,8 @@ tr.me .pl-n { color: var(--accent); }
 .banner .txt { flex: 1; font-size: 12.5px; color: var(--t2); line-height: 1.5; }
 .banner .txt b { color: var(--t1); font-weight: 600; }
 .banner.bad { border-left-color: var(--loss); }
+.banner .bar { height: 3px; background: var(--line2); border-radius: 2px; margin-top: 7px; overflow: hidden; }
+.banner .bar i { display: block; height: 100%; background: var(--accent); transition: width .6s; }
 
 .tbl { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; margin-bottom: 20px; }
 .tbl-bar { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
@@ -409,7 +411,7 @@ tr.me .pl-n { color: var(--accent); }
 <div id="setup-view" class="setup">
   <div class="setup-box">
     <h1><span class="logo"></span>L-Recall</h1>
-    <div class="lead">Two things to set before your replays can be played on their original patch.</div>
+    <div class="lead">A few things to set before your replays can be played on their original patch.</div>
     <div class="fld">
       <label>League of Legends.exe</label>
       <div class="inl"><div class="path unset" id="su-game">Looking for League...</div><button class="btn" onclick="pickSuGame()">Browse</button></div>
@@ -418,6 +420,10 @@ tr.me .pl-n { color: var(--accent); }
     <div class="fld">
       <label>Patch storage folder</label>
       <div class="inl"><div class="path unset" id="su-repo">Not selected</div><button class="btn" onclick="pickSuRepo()">Browse</button></div>
+    </div>
+    <div class="fld">
+      <label class="check" style="margin-top:0"><input type="checkbox" id="su-save-new" checked> Save new patches automatically</label>
+      <div class="hint">Starting with the patch you have installed now. The first one takes about 20 GB and a few minutes, in the background, and you can watch it happen on the Patches tab. Untick this to save patches yourself from the Patches tab instead.</div>
     </div>
     <button class="btn primary" id="su-save" disabled onclick="saveSu()">Continue</button>
   </div>
@@ -468,6 +474,7 @@ tr.me .pl-n { color: var(--accent); }
     <div class="page"><div class="page-in">
       <div class="ph"><h1>Patches</h1><div class="r"><button class="btn" id="clear-ready-btn" disabled onclick="clearReady()">Clear ready files</button><button class="btn" onclick="addPatch()">Add from install...</button></div></div>
       <div class="pmeta" id="p-meta"></div>
+      <div id="save-banner"></div>
       <div id="store"></div>
       <div class="tbl">
         <div class="tbl-bar">
@@ -511,6 +518,8 @@ tr.me .pl-n { color: var(--accent); }
           <div>
             <div class="plist" id="gp-list"></div>
             <div class="inl"><button class="btn" onclick="findGP()" title="Look for League installs on this PC">Find</button><button class="btn" onclick="addGP()">Add...</button><button class="btn" id="rm-gp-btn" disabled onclick="rmGP()">Remove</button></div>
+            <label class="check"><input type="checkbox" id="save-new" onchange="setReplayStart({ save_new: this.checked })"> Save new patches automatically</label>
+            <div class="hint">When it's off, nothing gets saved until you hit Save it now on the Patches tab.</div>
           </div>
         </div>
         <div class="frow">
@@ -840,6 +849,8 @@ async function showApp() {
   }
   loadR();
   checkUpdate(false);
+  pollSave();
+  setInterval(pollSave, 2000);
 }
 
 // setup
@@ -867,7 +878,7 @@ async function pickSuRepo() {
   $('su-save').disabled = !(suGame && suRepo);
 }
 async function saveSu() {
-  await call('save_setup', { game_path: suGame, repository: suRepo });
+  await call('save_setup', { game_path: suGame, repository: suRepo, save_new: $('su-save-new').checked });
   try { config = await call('get_config'); } catch (e) { return; }
   showApp();
 }
@@ -932,7 +943,48 @@ async function loadR() {
 function updateTopStat() {
   $('top-stat').innerHTML = '<span><b>' + replays.length + '</b> replays</span>' +
     (repoOk ? '<span><b>' + stored.length + '</b> patches stored</span>'
-            : '<span class="warn" onclick="showTab(\'settings\')">Patch storage not found</span>');
+            : '<span class="warn" onclick="showTab(\'settings\')">Patch storage not found</span>') +
+    (saveState ? '<span class="warn" style="cursor:pointer" onclick="showTab(\'patches\')">Saving ' + esc(saveState.version) + ' · ' + saveState.percent + '%</span>' : '');
+}
+
+// saving a new patch happens in the background. it used to be invisible, so a fresh install looked like it
+// was doing nothing. now the top bar and the patches tab say what's going on
+let saveState = null, lastStorage = null;
+async function pollSave() {
+  let s = null;
+  try { s = await call('save_status'); } catch (e) { return; }
+  const was = saveState;
+  saveState = s;
+  if (JSON.stringify(was) !== JSON.stringify(s)) { updateTopStat(); renderSaveBanner(); }
+  if (was && !s) { loadP(); loadR(); }  // just finished, or stopped
+}
+function renderSaveBanner() {
+  const el = $('save-banner'); if (!el) return;
+  if (saveState) {
+    el.innerHTML = '<div class="banner"><div class="txt"><b>Saving patch ' + esc(saveState.version) + '</b> in the background, ' + saveState.percent +
+      '% done. Replays from it can be watched once it\'s finished. It pauses by itself if you start a game.' +
+      '<div class="bar"><i style="width:' + saveState.percent + '%"></i></div></div>' +
+      '<button class="btn" onclick="stopSaving()">Stop for now</button></div>';
+    return;
+  }
+  const missing = ((lastStorage && lastStorage.installed) || []).filter(i => !i.saved);
+  if (!missing.length) { el.innerHTML = ''; return; }
+  const m = missing[0];
+  el.innerHTML = '<div class="banner"><div class="txt"><b>Your installed patch (' + esc(m.name) + ') isn\'t saved yet.</b> ' +
+    (lastStorage.save_new_patches === false || config.save_new_patches === false
+      ? 'Saving new patches is off, so it only gets saved if you ask. '
+      : 'It gets saved on the next check, or you can start it now. ') +
+    (stored.length ? '' : 'The first one takes about 20 GB and a few minutes.') + '</div>' +
+    '<button class="btn primary" onclick="saveNow()">Save it now</button></div>';
+}
+async function saveNow() {
+  await call('save_patch_now');
+  toast('Saving started. It shows here as it goes.');
+  setTimeout(pollSave, 1500);
+}
+async function stopSaving() {
+  await call('stop_saving');
+  toast('Stopped. What\'s saved so far is kept, and it carries on next time.');
 }
 
 $('filters').addEventListener('click', e => {
@@ -1572,6 +1624,8 @@ async function loadStorage() {
   let s;
   try { s = await call('get_storage'); } catch (e) { return; }
   if (seq !== storeSeq) return;
+  lastStorage = s;
+  renderSaveBanner();
   if (!s.exists) {
     el.innerHTML = '<div class="banner bad"><div class="txt"><b>Patch storage not found.</b> ' + (s.path ? esc(s.path) + ' isn\'t available.' : '') + '</div><button class="btn" onclick="pickRepo()">Choose folder...</button></div>';
     return;
@@ -1642,6 +1696,7 @@ async function loadSettings() {
   $('prep-newest').checked = config.prepare_newest !== false;
   $('quick-chk').checked = config.quick_start !== false;
   $('clear-exit').checked = !!config.clear_on_exit;
+  $('save-new').checked = config.save_new_patches !== false;
   $('drive-sel').value = config.drive || '';
   $('drive-sel').options[0].textContent = 'Storage drive: work it out' + (config.drive_found ? ' (' + config.drive_found + ')' : '');
   loadCacheInfo();
@@ -1733,6 +1788,7 @@ async function setReplayStart(opts) {
   if ('newest' in opts) config.prepare_newest = opts.newest;
   if ('quick' in opts) config.quick_start = opts.quick;
   if ('clear_on_exit' in opts) config.clear_on_exit = opts.clear_on_exit;
+  if ('save_new' in opts) { config.save_new_patches = opts.save_new; renderSaveBanner(); }
   if ('drive' in opts) config.drive = opts.drive;
 }
 async function reportProblem() {

@@ -842,14 +842,21 @@ class LargeVCS:
             if wad_files:
                 known = self._known_blobs()
                 writer = PackWriter(self.packs)
-                wad_files.sort(key=lambda w: os.path.getsize(w[0]), reverse=True)
+                sizes = {fp: os.path.getsize(fp) for fp, _ in wad_files}
+                wad_files.sort(key=lambda w: sizes[w[0]], reverse=True)
                 print(f'Storing {len(wad_files)} WAD archives ({workers} threads)...')
+                # counted in bytes. biggest go first, so counting archives sat near 0% and then raced to the end
+                label, total, done = f'Storing patch {show(tag)}', sum(sizes.values()) or 1, 0
                 try:
                     with _pool(workers) as executor:
-                        futures = {executor.submit(self._store_wad, fp, known, None, writer): rp
+                        futures = {executor.submit(self._store_wad, fp, known, None, writer): (fp, rp)
                                    for fp, rp in wad_files}
-                        for future in track(as_completed(futures), total=len(futures), label=f'Storing patch {show(tag)}'):
-                            self._record(patch, dups, future.result(), futures[future])
+                        step(0, total, label)
+                        for future in as_completed(futures):
+                            fp, rp = futures[future]
+                            self._record(patch, dups, future.result(), rp)
+                            done += sizes[fp]
+                            step(done, total, label)
                 finally:
                     writer.seal()
 

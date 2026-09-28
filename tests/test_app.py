@@ -487,6 +487,24 @@ class ReportTest(TempDirTest):
         self.assertIn('<you>', text)
 
 
+class SaveStatusTest(TempDirTest):
+    def test_percent_for_the_window_and_tray(self):
+        import types
+        from league_vcs.gui import GUI
+        status = lambda saving: GUI.save_status(types.SimpleNamespace(saving=saving))
+        self.assertIsNone(status(None))
+        self.assertEqual(status({'version': '16.20', 'done': 0, 'total': 0}), {'version': '16.20', 'percent': 0})
+        self.assertEqual(status({'version': '16.20', 'done': 50, 'total': 200}), {'version': '16.20', 'percent': 25})
+        # never says 100 while it's still going, the last bit is writing the patch list
+        self.assertEqual(status({'version': '16.20', 'done': 200, 'total': 200})['percent'], 99)
+
+    def test_saving_new_patches_is_on_unless_turned_off(self):
+        path = os.path.join(self.tmp, 'user_settings.json')
+        with open(path, 'w') as f:
+            f.write('{"configured": true}')
+        self.assertTrue(Config(path)['save_new_patches'])
+
+
 class ConfigTest(TempDirTest):
     def test_corrupt_config_is_set_aside(self):
         path = os.path.join(self.tmp, 'user_settings.json')

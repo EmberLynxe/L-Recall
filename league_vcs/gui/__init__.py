@@ -69,6 +69,8 @@ class GUI:
         self.tray_icon: Optional[TrayItem] = None
 
         self.scan_lock = threading.Lock()
+        self.saving = None  # {version, done, total} while a patch is being saved in the background
+        self._scan_stop = None
         self.replay_frame = None
         self.settings_frame = None
 
@@ -179,6 +181,9 @@ class GUI:
 
     def tray_status(self):
         """one line under the name in the tray menu. cheap, it runs every time the menu opens"""
+        saving = self.save_status()
+        if saving:
+            return f"Saving patch {saving['version']} · {saving['percent']}%"
         if self.scan_lock.locked():
             return 'Checking for new patches...'
         repo = core.repo
@@ -301,7 +306,7 @@ class GUI:
             return
 
         self.set_high_priority()
-        frame = self.settings_frame = SettingsFrame(self.config, quit_app=self.exit, notify=self.notify)
+        frame = self.settings_frame = SettingsFrame(self.config, quit_app=self.exit, notify=self.notify, saver=self)
         frame.Show()
         frame.on_close(self._on_settings_closed)
 
@@ -327,7 +332,29 @@ class GUI:
     def scan_game_directories(self, *_):
         threading.Thread(target=self._scan_game_directories, daemon=True, args=(True,)).start()
 
-    def _scan_game_directories(self, user_initiated=False):
+    def save_status(self):
+        """the patch being saved in the background right now, for the window and the tray. None if nothing is"""
+        saving = self.saving
+        if not saving:
+            return None
+        percent = int(saving['done'] * 100 / saving['total']) if saving['total'] else 0
+        return {'version': saving['version'], 'percent': min(percent, 99)}
+
+    def save_patch_now(self):
+        """the Save it now button. same as a check for new patches, but saves even with saving turned off"""
+        threading.Thread(target=self._scan_game_directories, daemon=True, args=(True, True)).start()
+
+    def stop_saving(self):
+        """Stop for now. whatever got saved so far is kept, and the next check carries on from there"""
+        if self.saving and self._scan_stop:
+            self._scan_stop.set()
+
+    def _saving_progress(self, done, total, label):
+        # storing goes through a few steps, and the one that matters is the archives
+        if self.saving and label.startswith('Storing patch'):
+            self.saving['done'], self.saving['total'] = done, total
+
+    def _scan_game_directories(self, user_initiated=False, save_anyway=False):
         if winproc.game_running():
             if user_initiated:
                 wx.CallAfter(self.tray_icon.ShowBalloon,
@@ -342,7 +369,8 @@ class GUI:
                              text='Try again in a bit.')
             return
 
-        with self.scan_lock, reporting(None, self._stop_when_game_starts()):
+        self._scan_stop = self._stop_when_game_starts()
+        with self.scan_lock, reporting(self._saving_progress, self._scan_stop):
             wx.CallAfter(self.update_tray_menu)
 
             try:
@@ -379,7 +407,11 @@ class GUI:
                     except Exception as e:
                         print(f'Top-up of {show(version)} failed: {e}')
 
-            if new_versions:
+            if new_versions and not (save_anyway or self.config.get('save_new_patches', True)):
+                # turned off in settings (or at setup). the patches tab says there's one to save
+                print(f"Not saving {', '.join(sorted(show(v) for v in new_versions))}, saving new patches is off.")
+                to_update = []
+            elif new_versions:
                 wx.CallAfter(self.tray_icon.ShowBalloon,
                              title=f"Found new patch{'es' if len(new_versions) > 1 else ''}!",
                              text=f"Storing {', '.join(sorted({show(v) for v in new_versions}))} in the background.")
@@ -389,6 +421,7 @@ class GUI:
                              text='Your repository is up to date!')
 
             for game_path, version in (to_update if not stopped else []):
+                self.saving = {'version': show(version), 'done': 0, 'total': 0}
                 try:
                     if first:
                         # full speed for the very first one. still stops the moment a game starts
@@ -399,7 +432,7 @@ class GUI:
                         core.add(os.path.dirname(game_path), workers=max(2, (os.cpu_count() or 4) // 2))
                 except Cancelled:
                     stopped = True
-                    print(f'Stopped storing {show(version)}, a game started. Next check carries on.')
+                    print(f'Stopped storing {show(version)} (a game started, or it was stopped). Next check carries on.')
                     break
                 except core.DiskFull as e:
                     print(f'Skipped {show(version)}: {e}')
@@ -413,6 +446,7 @@ class GUI:
                     self.notify(f"Couldn't store patch {show(version)}", 'Check the log in the logs folder for details.')
                     continue
                 finally:
+                    self.saving = None
                     if first and not self.settings_frame:
                         self.set_low_priority()
                 wx.CallAfter(self.tray_icon.ShowBalloon,

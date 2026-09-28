@@ -53,11 +53,12 @@ def _same_url(a, b):
 
 
 class SettingsFrame(CallbackFrame):
-    def __init__(self, config: Config, quit_app=None, notify=None):
+    def __init__(self, config: Config, quit_app=None, notify=None, saver=None):
         super().__init__(None, title='L-Recall')
         self.SetBackgroundColour(wx.Colour(11, 15, 20))
         self.config = config
         self._notify = notify
+        self._saver = saver  # the tray app, which does the saving of new patches in the background
         self._icons_done = frozenset()
         self._icons_lock = threading.Lock()
         self._busy = False
@@ -214,6 +215,7 @@ class SettingsFrame(CallbackFrame):
             'prepare_newest': self.config.get('prepare_newest', True),
             'quick_start': self.config.get('quick_start', True),
             'clear_on_exit': self.config.get('clear_on_exit', False),
+            'save_new_patches': self.config.get('save_new_patches', True),
             'drive': self.config.get('drive', ''),
             'drive_found': self._drive_found(),
         })
@@ -309,7 +311,34 @@ class SettingsFrame(CallbackFrame):
             'report': report,
             'needs_optimize': any(r['whole'] for r in report),
             'space_warning': self.config.get('space_warning', True),
+            'installed': self._installed(repo),
+            'save_new_patches': self.config.get('save_new_patches', True),
         })
+
+    def _installed(self, repo):
+        """the patch each league install is on, and whether it's been saved yet"""
+        stored, out = set(repo.list()), []
+        for path in self.config.get('game_paths', []):
+            try:
+                version = GameParser(path).version
+            except Exception:
+                continue
+            if version and not any(i['tag'] == version for i in out):
+                out.append({'tag': version, 'name': show(version), 'saved': version in stored})
+        return out
+
+    def _handle_save_status(self, req_id, _msg):
+        self._respond(req_id, self._saver.save_status() if self._saver else None)
+
+    def _handle_save_patch_now(self, req_id, _msg):
+        if self._saver:
+            self._saver.save_patch_now()
+        self._respond(req_id, True)
+
+    def _handle_stop_saving(self, req_id, _msg):
+        if self._saver:
+            self._saver.stop_saving()
+        self._respond(req_id, True)
 
     def _handle_ignore_space_warning(self, req_id, _msg):
         self.config['space_warning'] = False
@@ -633,6 +662,8 @@ class SettingsFrame(CallbackFrame):
             core.prepare_newest = self.config['prepare_newest'] = bool(msg['newest'])
         if 'clear_on_exit' in msg:
             self.config['clear_on_exit'] = bool(msg['clear_on_exit'])
+        if 'save_new' in msg:
+            self.config['save_new_patches'] = bool(msg['save_new'])
         if 'drive' in msg:
             from large_vcs import drives
             kind = msg['drive'] if msg['drive'] in drives.NAMES else ''

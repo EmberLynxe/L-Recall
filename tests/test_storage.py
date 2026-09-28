@@ -737,6 +737,21 @@ class DriveTest(RepoTest):
         self.assertStagedEqual(self.inst)
 
 
+class SavingProgressTest(RepoTest):
+    def test_saving_counts_bytes_and_ends_at_the_total(self):
+        from large_vcs.progress import reporting
+        inst = self.install('p1', {r'DATA\big.wad.client': ('wad', random_assets(40, seed=71, size=(20000, 90000)), 71),
+                                   r'DATA\small.wad.client': ('wad', random_assets(3, seed=72), 72)})
+        seen = []
+        with reporting(lambda done, total, label: seen.append((done, total, label))):
+            self.repo.add(inst, 'P1')
+        mine = [(d, t) for d, t, label in seen if label == 'Storing patch P1']
+        size = sum(os.path.getsize(os.path.join(inst, 'DATA', f)) for f in ('big.wad.client', 'small.wad.client'))
+        self.assertTrue(mine)
+        self.assertEqual(mine[-1], (size, size))
+        self.assertTrue(all(t == size for _, t in mine))
+
+
 class RepackTest(RepoTest):
     def test_repack_keeps_every_patch_byte_identical(self):
         shared = random_assets(30, seed=30, size=(40, 90000))

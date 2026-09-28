@@ -23,7 +23,7 @@ class InitialConfigFrame(Frame):
 
         # dip, not pixels. a fixed 520x420 cut the page off at 150% scaling
         area = wx.Display(max(wx.Display.GetFromWindow(self), 0)).GetClientArea()
-        want = self.FromDIP(wx.Size(560, 480))
+        want = self.FromDIP(wx.Size(560, 580))
         self.SetMinSize(self.FromDIP(wx.Size(420, 380)))
         self.SetSize(min(want.width, int(area.width * .92)), min(want.height, int(area.height * .92)))
         self.CentreOnScreen()
@@ -123,6 +123,7 @@ class InitialConfigFrame(Frame):
             elif action == 'save_setup':
                 self.config['game_paths'] = [msg['game_path']]
                 self.config['repository'] = msg['repository']
+                self.config['save_new_patches'] = bool(msg.get('save_new', True))
                 self.config['configured'] = True
                 self.config.save()
                 self._respond(req_id, True)

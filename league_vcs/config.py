@@ -67,6 +67,7 @@ class Config(dict):
         'quick_start': True,
         'space_warning': True,
         'clear_on_exit': False,
+        'save_new_patches': True,  # save each patch league updates to. set at setup, off means only when asked
         'drive': '',  # empty = work it out
     }
 
