@@ -486,18 +486,34 @@ class LargeVCS:
     def _patch_path(self, tag, ext='.json'):
         return self.repo_path('patches', _check_tag(tag) + ext)
 
-    def get_patch(self, tag):
+    def _read_patch(self, tag):
+        """({hash: path}, {hash: [more paths]}) from the patch file. some league vcs builds saved every name
+        an identical file had, as {hash: [path, ...]}. those read the same as ours, the first name in the
+        patch and the rest as dups, and the next time the patch gets saved it's saved our way"""
         try:
             with open(self._patch_path(tag)) as patch_file:
-                patch = json.load(patch_file)
+                raw = json.load(patch_file)
         except FileNotFoundError:
-            return None
-        if not isinstance(patch, dict):
-            raise ValueError(f'Patch {tag} is corrupt')
-        for checksum, rel_path in patch.items():
-            _check_digest(checksum)
-            _check_rel(rel_path)
-        return patch
+            return None, {}
+        if not isinstance(raw, dict):
+            raise ValueError(f'Patch {show(tag)} is corrupt')
+        patch, extra = {}, {}
+        try:
+            for checksum, rel in raw.items():
+                _check_digest(checksum)
+                if isinstance(rel, list) and rel:
+                    patch[checksum] = _check_rel(rel[0])
+                    if len(rel) > 1:
+                        extra[checksum] = [_check_rel(r) for r in rel[1:]]
+                else:
+                    patch[checksum] = _check_rel(rel)
+        except ValueError as e:
+            raise ValueError(f'Patch {show(tag)} has a damaged file list ({e}). Deleting it on the Patches tab '
+                             'and saving it again fixes it.') from None
+        return patch, extra
+
+    def get_patch(self, tag):
+        return self._read_patch(tag)[0]
 
     def _save_patch(self, tag, patch):
         _write_json_atomic(self._patch_path(tag), patch)
@@ -512,15 +528,19 @@ class LargeVCS:
             with open(self._dups_path(tag)) as f:
                 dups = json.load(f)
         except (FileNotFoundError, ValueError):
-            return {}
+            dups = {}
         if not isinstance(dups, dict):
-            return {}
+            dups = {}
         for checksum, paths in dups.items():
             _check_digest(checksum)
             if not isinstance(paths, list):
-                raise ValueError(f'Patch {tag} is corrupt')
+                raise ValueError(f'Patch {show(tag)} is corrupt')
             for rel_path in paths:
                 _check_rel(rel_path)
+        # the extra names from a patch saved as {hash: [path, ...]}, see _read_patch
+        for checksum, paths in self._read_patch(tag)[1].items():
+            have = dups.setdefault(checksum, [])
+            have.extend(p for p in paths if p not in have)
         return dups
 
     def _save_dups(self, tag, dups, keep_file=False):
@@ -1035,7 +1055,10 @@ class LargeVCS:
         for tag in (self.list() if tags is None else tags):
             if os.path.exists(self._dups_path(tag)):
                 continue
-            patch = self.get_patch(tag) or {}
+            patch, extra = self._read_patch(tag)
+            if extra:
+                continue  # saved as {hash: [every name]}, so nothing was lost
+            patch = patch or {}
             key = next((c for c, r in patch.items() if _is_wad_path(r) and self._is_stub(c)), None)
             if key is None:
                 continue

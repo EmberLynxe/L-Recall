@@ -752,6 +752,53 @@ class SavingProgressTest(RepoTest):
         self.assertTrue(all(t == size for _, t in mine))
 
 
+class ListFormatTest(RepoTest):
+    """some league vcs builds saved patches as {hash: [every path]}. people point l-recall at that storage"""
+
+    def to_list_format(self, tag):
+        lists = {}
+        for checksum, rel in sorted(self.repo.pairs(tag), key=lambda p: p[1]):
+            lists.setdefault(checksum, []).append(rel)
+        with open(self.repo._patch_path(tag), 'w') as f:
+            json.dump(lists, f)
+        os.unlink(self.repo._dups_path(tag))
+        return lists
+
+    def setUp(self):
+        super().setUp()
+        same = large_vcs.STUB_WAD  # riot's empty archive, the same file under several names
+        self.inst = self.install('p1', {'a.dll': b'one', 'code-metadata.json': b'{"v": 1}',
+                                        r'DATA\FINAL\Audio.wad.client': same, r'DATA\FINAL\Online.wad.client': same,
+                                        r'DATA\FINAL\Champions\Ahri.wad.client': ('wad', random_assets(5, seed=81), 81)})
+        self.repo.add(self.inst, 'P1')
+
+    def test_it_builds_and_counts_every_name(self):
+        before = self.repo.pairs('P1')
+        lists = self.to_list_format('P1')
+        self.assertTrue(any(len(v) > 1 for v in lists.values()))  # the identical archives, under both names
+        self.assertEqual(self.repo.pairs('P1'), before)
+        self.repo.restore('P1')
+        self.assertStagedEqual(self.inst)
+        self.assertEqual(self.repo.verify(log=lambda *_: None), {})
+
+    def test_saving_it_again_turns_it_into_ours(self):
+        before = self.repo.pairs('P1')
+        self.to_list_format('P1')
+        self.repo._rekey('P1', {'0' * 64: '1' * 64})  # nothing to rename, just loads and leaves it
+        with open(os.path.join(self.inst, 'new.txt'), 'wb') as f:
+            f.write(b'riot added this later')
+        self.repo.top_up(self.inst, 'P1')  # a real save
+        with open(self.repo._patch_path('P1')) as f:
+            self.assertTrue(all(isinstance(v, str) for v in json.load(f).values()))
+        self.assertEqual(self.repo.pairs('P1') - before, {(hash_file(os.path.join(self.inst, 'new.txt')), 'new.txt')})
+
+    def test_a_really_broken_one_names_the_patch(self):
+        with open(self.repo._patch_path('P1'), 'w') as f:
+            json.dump({'a' * 64: [5]}, f)
+        with self.assertRaisesRegex(ValueError, 'Patch P1 has a damaged file list'):
+            self.repo.get_patch('P1')
+
+
 class RepackTest(RepoTest):
     def test_repack_keeps_every_patch_byte_identical(self):
         shared = random_assets(30, seed=30, size=(40, 90000))
