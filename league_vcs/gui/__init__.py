@@ -2,6 +2,7 @@ import ctypes
 import os
 import sys
 import threading
+import traceback
 import webbrowser
 from typing import Optional
 
@@ -406,6 +407,7 @@ class GUI:
                         break
                     except Exception as e:
                         print(f'Top-up of {show(version)} failed: {e}')
+                        traceback.print_exc()  # the details, for a problem report
 
             if new_versions and not (save_anyway or self.config.get('save_new_patches', True)):
                 # turned off in settings (or at setup). the patches tab says there's one to save
@@ -443,7 +445,9 @@ class GUI:
                     continue
                 except Exception as e:
                     print(f'Skipped {show(version)}: {e}')
-                    self.notify(f"Couldn't store patch {show(version)}", 'Check the log in the logs folder for details.')
+                    traceback.print_exc()
+                    self.notify(f"Couldn't store patch {show(version)}",
+                                'Settings > Save a problem report zips up the details if you want to send them.')
                     continue
                 finally:
                     self.saving = None
@@ -460,6 +464,7 @@ class GUI:
                     print('Stopped getting the newest patch ready, a game started. Next check carries on.')
                 except Exception as e:
                     print(f"Couldn't get the newest patch ready: {e}")
+                    traceback.print_exc()
 
         wx.CallAfter(self.update_tray_menu)
         winproc.trim_memory()

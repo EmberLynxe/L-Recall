@@ -618,6 +618,7 @@ tr.me .pl-n { color: var(--accent); }
     <div class="modal-f">
       <span class="working" id="con-sp">Working...</span>
       <button class="btn" id="con-cancel" style="display:none;margin-left:auto" onclick="cancelCon()" title="Stops safely. Anything half done gets tidied up">Cancel</button>
+      <button class="btn" id="con-report" style="display:none;margin-left:auto" onclick="reportProblem()" title="Zips your last few logs into Downloads, with your username taken out, so you can send them to whoever's helping">Save a problem report</button>
       <button class="btn" id="con-close" style="display:none;margin-left:auto" onclick="closeCon()">Close</button>
     </div>
   </div>
@@ -710,6 +711,9 @@ window.__console_done = status => {
   _eta = _left = null;
   $('con-close').style.display = '';
   $('con-cancel').style.display = 'none';
+  // right there when something breaks, not hidden away in settings
+  $('con-report').style.display = ok || cancelled ? 'none' : '';
+  $('con-close').style.marginLeft = ok || cancelled ? 'auto' : '6px';
   $('con-sp').textContent = ok ? '✓ Finished in ' + took : cancelled ? 'Cancelled after ' + took : "Didn't finish (" + took + '), see above';
   $('con-sp').className = 'working ' + (ok ? 'ok' : cancelled ? '' : 'bad');
   $('con-prog').classList.toggle('bad', !ok && !cancelled);
@@ -1916,6 +1920,7 @@ function openCon(title, notify = true, cancellable = true) {
   _pg = null;
   $('con-prog').classList.remove('bad');
   $('con-close').style.display = 'none';
+  $('con-report').style.display = 'none';
   $('con-sp').style.display = '';
   $('con-ov').classList.add('on');
 }

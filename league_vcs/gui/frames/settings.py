@@ -728,6 +728,19 @@ class SettingsFrame(CallbackFrame):
                       f'Patches stored: {", ".join(show(t) for t in tags) or "none"}',
                       f'Ready to play: {show(current) if current else "nothing"}, kept: {len(repo.kept())}',
                       f'Free space: {shutil.disk_usage(repo.files_dir).free / 1024 ** 3:.0f} GB']
+            # every patch's file list gets read, so a damaged one shows up here and not just as an error
+            older, broken = [], []
+            for tag in tags:
+                try:
+                    if repo._read_patch(tag)[1]:
+                        older.append(show(tag))
+                    repo.pairs(tag)
+                except Exception as e:
+                    broken.append(f'  {tag}: {e}')
+            if older:
+                lines.append(f'Saved by League VCS: {", ".join(older)}')
+            lines.append('Patch file lists: ' + ('all fine' if not broken else f'{len(broken)} damaged'))
+            lines += broken
         else:
             lines.append('Storage folder: not found')
         lines.append(f'Replays found: {len(self._replays)}')
@@ -810,12 +823,19 @@ class SettingsFrame(CallbackFrame):
                 print('Cancelled.')
             except Exception as e:
                 status = 'failed'
+                # the whole thing goes in the log, where a problem report picks it up. it used to only get
+                # the one line, which told nobody where it came from
+                _log_only(f'{getattr(func, "__name__", "job")} failed:\n{traceback.format_exc()}')
                 known = (UserInputException, ValueError, AssertionError)
                 if core.disk_full(e):
                     print('The drive ran out of space. Free some up, keep fewer patches ready in Settings, '
                           'or delete patches you don\'t need, then try again.')
+                elif isinstance(e, known):
+                    print(str(e))
                 else:
-                    print(str(e) if isinstance(e, known) else traceback.format_exc())
+                    print(f'Something went wrong that L-Recall wasn\'t expecting, so it stopped there ({e}). '
+                          'Trying again often sorts it. If it keeps happening, hit Save a problem report below '
+                          'and send the zip over, it has the details.')
         self._busy = False
         self._console_done(status)
         self._respond(req_id, True)
@@ -969,6 +989,15 @@ class SettingsFrame(CallbackFrame):
             print(f'Preparing patch {show(patch)}...')
             core.restore(patch)
         print('Done!')
+
+
+def _log_only(text):
+    """straight into the log file, not the window"""
+    try:
+        if sys.__stdout__ is not None:
+            sys.__stdout__.write(text if text.endswith('\n') else text + '\n')
+    except Exception:
+        pass
 
 
 class _ConsoleWriter:

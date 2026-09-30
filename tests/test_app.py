@@ -505,6 +505,34 @@ class SaveStatusTest(TempDirTest):
         self.assertTrue(Config(path)['save_new_patches'])
 
 
+class FailedJobTest(unittest.TestCase):
+    def run_job(self, func):
+        from league_vcs.gui.frames import settings
+        window, log, done = [], [], []
+        fake = mock.Mock(_push_console=window.append, _console_done=done.append)
+        with mock.patch.object(settings, '_log_only', log.append), mock.patch.object(settings.wx, 'CallAfter'), \
+                mock.patch.object(settings.winproc, 'trim_memory'):
+            settings.SettingsFrame._run_console_op_inner(fake, 'r1', func)
+        return ''.join(window), ''.join(log), done
+
+    def test_a_surprise_gets_a_plain_message_and_the_details_go_in_the_log(self):
+        def prepare():
+            {}['missing']
+        window, log, done = self.run_job(prepare)
+        self.assertEqual(done, ['failed'])  # which is what shows the report button
+        self.assertIn('Save a problem report', window)
+        self.assertNotIn('Traceback', window)
+        self.assertIn('Traceback', log)
+        self.assertIn('prepare failed', log)
+
+    def test_a_known_problem_says_just_the_problem(self):
+        def prepare():
+            raise core.UserInputException('League is running. Close the game (and any replay) first.')
+        window, log, done = self.run_job(prepare)
+        self.assertEqual(window.strip(), 'League is running. Close the game (and any replay) first.')
+        self.assertIn('Traceback', log)  # still logged in full
+
+
 class ConfigTest(TempDirTest):
     def test_corrupt_config_is_set_aside(self):
         path = os.path.join(self.tmp, 'user_settings.json')
