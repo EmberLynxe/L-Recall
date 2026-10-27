@@ -77,3 +77,36 @@ def newer_than_running(force=False):
     if release and parse_version(release['version']) > parse_version(__version__):
         return release
     return None
+
+
+def notes_for(version, timeout=10):
+    """release notes for one version, '' if github doesn't have any or we're offline"""
+    url = f'https://api.github.com/repos/{REPO}/releases/tags/v{version}'
+    req = urllib.request.Request(url, headers={'User-Agent': 'l-recall', 'Accept': 'application/vnd.github+json'})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return (json.loads(r.read()).get('body') or '')[:2000]
+    except Exception:
+        return ''
+
+
+def whats_new(config, fetch=True):
+    """notes for the version we're running, once, on the first start after an update. None otherwise.
+    the updater saves the notes before restarting, so normally nothing gets fetched. someone who unzipped
+    the new version over the old one gets them from github instead"""
+    seen = config.get('seen_version') or ''
+    if seen == __version__:
+        return None
+    config['seen_version'] = __version__
+    saved = config.get('whats_new') or {}
+    config['whats_new'] = None
+    config.save()
+    # brand new install, or going back a version. nothing to tell them
+    if not config.get('configured') or (seen and parse_version(seen) > parse_version(__version__)):
+        return None
+    notes = saved.get('notes') if saved.get('version') == __version__ else None
+    if notes is None and fetch:
+        notes = notes_for(__version__)
+    if not (notes or '').strip():
+        return None
+    return {'version': __version__, 'notes': notes}

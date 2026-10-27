@@ -68,6 +68,42 @@ class UpdateTest(unittest.TestCase):
         self.assertEqual((r['zip'], r['sha256'], r['size']), (ours, ours + '.sha256', 5))
 
 
+class FakeConfig(dict):
+    def save(self):
+        pass
+
+
+class WhatsNewTest(unittest.TestCase):
+    def run_as(self, version, config, online=''):
+        with mock.patch.object(updates, '__version__', version), \
+                mock.patch.object(updates, 'notes_for', return_value=online) as fetch:
+            return updates.whats_new(config), fetch
+
+    def test_updater_notes_show_once(self):
+        cfg = FakeConfig(configured=True, seen_version='1.0.2', whats_new={'version': '1.0.3', 'notes': '- thing'})
+        shown, fetch = self.run_as('1.0.3', cfg)
+        self.assertEqual(shown, {'version': '1.0.3', 'notes': '- thing'})
+        fetch.assert_not_called()
+        self.assertIsNone(self.run_as('1.0.3', cfg)[0])
+
+    def test_unzipped_by_hand_fetches(self):
+        cfg = FakeConfig(configured=True, seen_version='1.0.2')
+        self.assertEqual(self.run_as('1.0.3', cfg, online='- from github')[0]['notes'], '- from github')
+
+    def test_from_before_this_existed(self):
+        cfg = FakeConfig(configured=True)
+        self.assertEqual(self.run_as('1.0.3', cfg, online='- x')[0]['version'], '1.0.3')
+
+    def test_quiet_for_new_installs_downgrades_and_no_notes(self):
+        self.assertIsNone(self.run_as('1.0.3', FakeConfig(configured=False), online='- x')[0])
+        self.assertIsNone(self.run_as('1.0.2', FakeConfig(configured=True, seen_version='1.0.3'), online='- x')[0])
+        self.assertIsNone(self.run_as('1.0.3', FakeConfig(configured=True, seen_version='1.0.2'))[0])
+
+    def test_old_saved_notes_are_ignored(self):
+        cfg = FakeConfig(configured=True, seen_version='1.0.1', whats_new={'version': '1.0.2', 'notes': '- old'})
+        self.assertEqual(self.run_as('1.0.3', cfg, online='- new')[0]['notes'], '- new')
+
+
 class SelfUpdateTest(unittest.TestCase):
     def serve(self, files):
         """urlopen that hands out these bytes by url"""

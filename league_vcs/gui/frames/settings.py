@@ -419,6 +419,7 @@ class SettingsFrame(CallbackFrame):
         self.config['game_paths'] = [msg['game_path']]
         self.config['repository'] = msg['repository']
         self.config['configured'] = True
+        self.config['seen_version'] = __version__  # new install, nothing's new to them
         self.config.save()
         self._respond(req_id, True)
 
@@ -543,6 +544,8 @@ class SettingsFrame(CallbackFrame):
         print(f"Downloading L-Recall {release['version']}...")
         new = selfupdate.download(release)
         print('Download matches its published hash.')
+        self.config['whats_new'] = {'version': release['version'], 'notes': release.get('notes') or ''}
+        self.config.save()
         repo = self._repo_or_none()
         if repo:
             # a patch getting stored right now finishes first. the lock is never let go on purpose,
@@ -560,6 +563,9 @@ class SettingsFrame(CallbackFrame):
             # this runs on the worker thread and wx timers can only start on the main one. it used to
             # blow up here, so the app never closed and the update sat waiting for it
             wx.CallAfter(wx.CallLater, 2500, self._quit_app)
+
+    def _handle_whats_new(self, req_id, _msg):
+        self._respond(req_id, updates.whats_new(self.config, fetch=self.config.get('check_updates', True)))
 
     def _handle_dismiss_update(self, req_id, msg):
         self.config['dismissed_update'] = msg.get('version', '')

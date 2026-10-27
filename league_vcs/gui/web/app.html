@@ -392,6 +392,12 @@ tr.me .pl-n { color: var(--accent); }
 .cfm { width: 400px; background: var(--panel); border: 1px solid var(--line2); border-radius: 4px; padding: 18px; box-shadow: 0 16px 48px rgba(0,0,0,.5); }
 .cfm p { font-size: 13px; color: var(--t1); line-height: 1.55; margin-bottom: 16px; }
 .cfm .acts { justify-content: flex-end; }
+.wn { width: 440px; }
+.wn h2 { font-size: 14px; font-weight: 600; color: var(--t1); margin-bottom: 4px; }
+.wn .wn-lead { font-size: 12.5px; color: var(--t3); margin-bottom: 10px; }
+.wn ul { max-height: 320px; overflow-y: auto; margin: 0 0 16px; padding-left: 18px; font-size: 12.5px; color: var(--t2); line-height: 1.55; }
+.wn li { margin-bottom: 4px; }
+.wn li.p { list-style: none; margin-left: -18px; }
 
 .ctx { display: none; position: fixed; min-width: 190px; background: var(--raise); border: 1px solid var(--line2); border-radius: 3px; box-shadow: 0 8px 24px rgba(0,0,0,.45); z-index: 200; padding: 3px 0; }
 .ctx.on { display: block; }
@@ -634,6 +640,17 @@ tr.me .pl-n { color: var(--accent); }
   </div>
 </div>
 
+<div class="ov" id="wn-ov">
+  <div class="cfm wn">
+    <h2 id="wn-h"></h2>
+    <p class="wn-lead">Here's what changed since last time:</p>
+    <ul id="wn-list"></ul>
+    <div class="acts">
+      <button class="btn primary" onclick="$('wn-ov').classList.remove('on')">Cool, thanks</button>
+    </div>
+  </div>
+</div>
+
 <div class="ctx" id="ctx-menu">
   <div id="cx-watch" onclick="cxAct('watch')">Watch replay</div>
   <div id="cx-log" onclick="cxAct('log')">Open on League of Graphs</div>
@@ -852,6 +869,7 @@ async function showApp() {
     try { ddVersions = (await (await fetch('https://ddragon.leagueoflegends.com/api/versions.json')).json()).filter(v => /^\d/.test(v)); } catch (e2) {}
   }
   loadR();
+  whatsNew();
   checkUpdate(false);
   pollSave();
   setInterval(pollSave, 2000);
@@ -1932,6 +1950,20 @@ function cfmDlg(msg, ok = 'Delete', danger = true, no = 'Cancel') {
   return new Promise(res => { _cfmCb = res; $('cfm-msg').textContent = msg; $('cfm-ov').classList.add('on'); });
 }
 function cfmRes(v) { $('cfm-ov').classList.remove('on'); if (_cfmCb) { _cfmCb(v); _cfmCb = null; } }
+// once, first start after an update. notes are the tag message bullets, or github's own markdown if the tag had none
+async function whatsNew() {
+  let wn;
+  try { wn = await call('whats_new'); } catch (e) { return; }
+  if (!wn) return;
+  const lines = wn.notes.split(/\r?\n/).map(l => l.trim()).filter(l => l && !/^\*\*full changelog/i.test(l));
+  $('wn-h').textContent = 'You\'re on L-Recall ' + wn.version + ' now';
+  $('wn-list').innerHTML = lines.map(l => {
+    const bullet = /^[-*] /.test(l);
+    const text = l.replace(/^[-*] /, '').replace(/^#+\s*/, '').replace(/\*\*/g, '');
+    return '<li' + (bullet ? '' : ' class="p"') + '>' + esc(text) + '</li>';
+  }).join('');
+  $('wn-ov').classList.add('on');
+}
 
 init();
 </script>

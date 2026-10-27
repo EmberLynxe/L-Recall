@@ -61,6 +61,8 @@ class Config(dict):
         'auto_download_assets': True,
         'check_updates': True,
         'dismissed_update': '',
+        'seen_version': '',  # last version whose what's new got shown
+        'whats_new': None,  # {version, notes} the updater saves for the first start on the new version
         'keep_prepared': 1,
         'use_my_settings': True,
         'prepare_newest': True,
