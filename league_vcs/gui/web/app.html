@@ -80,6 +80,9 @@ a { color: inherit; }
 .stat { margin-left: auto; display: flex; align-items: center; gap: 16px; font-size: 12px; color: var(--t3); }
 .stat b { color: var(--t2); font-weight: 600; }
 .stat .warn { color: var(--accent); cursor: pointer; }
+.stat .lol { display: flex; align-items: center; }
+.stat .lol i { width: 6px; height: 6px; border-radius: 50%; background: #5a6574; margin-right: 6px; }
+.stat .lol.on i { background: var(--win); }
 
 .pnl { display: none; flex: 1; min-height: 0; }
 .pnl.on { display: flex; }
@@ -321,7 +324,7 @@ tr.me .pl-n { color: var(--accent); }
 .tbl-bar { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
 .tbl-bar h2 { font-size: 13px; font-weight: 600; color: var(--t1); margin-right: auto; }
 .tbl-bar h2 span { font-weight: 400; color: var(--t3); margin-left: 4px; }
-.prow { display: grid; grid-template-columns: 28px 80px 1fr 90px 170px 90px; align-items: center; height: 38px; padding: 0 10px; border-top: 1px solid var(--line); }
+.prow { display: grid; grid-template-columns: 28px 70px 100px 1fr 170px 90px; align-items: center; height: 38px; padding: 0 10px; border-top: 1px solid var(--line); }
 .prow .cost { font-size: 12px; color: var(--t2); }
 .prow .cost span { color: var(--t3); }
 .prow:first-of-type { border-top: 0; }
@@ -335,12 +338,103 @@ tr.me .pl-n { color: var(--accent); }
 .prow.sel .chk { background: var(--accent); border-color: var(--accent); }
 .prow.sel .chk::after { content: ''; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid #0b0f14; border-width: 0 2px 2px 0; transform: rotate(45deg); }
 .tbl .note { padding: 10px 12px; font-size: 12px; color: var(--t3); border-top: 1px solid var(--line); line-height: 1.5; }
+.tbl .note b { color: var(--t2); font-weight: 600; }
+
+.prow.miss .v { color: var(--t3); }
+.pill { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 1px 7px; border-radius: 3px; cursor: default; }
+.pill.rd { color: var(--accent); background: rgba(240,136,62,.12); }
+.pill.sv { color: var(--t2); background: var(--raise); }
+.pill.ms { color: var(--loss); background: rgba(239,102,112,.1); }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; flex-shrink: 0; }
+.dot.sv { background: #6d7f95; }
+.dot.sh, .sbar .sh { background: #4a5768; }
+.dot.un, .sbar .un { background: #7f9bc0; }
+.sbar .un { box-shadow: inset -1px 0 0 var(--bg); min-width: 3px; }
+.sbar .un:hover { background: #a9c2e3; }
+.prow.hl { background: var(--hover); }
+.dot.rd, .sbar .rd { background: var(--accent); }
+.dot.ms { background: var(--loss); }
+.dot.fr { background: var(--line2); }
+.how { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 1px; margin: 12px 0 4px; background: var(--line); border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
+.how > div { padding: 10px 12px; background: var(--panel); font-size: 12px; color: var(--t3); line-height: 1.5; }
+.how > div:nth-child(3) { padding-right: 28px; }
+.how b { display: flex; align-items: center; font-size: 12.5px; font-weight: 600; color: var(--t1); margin-bottom: 2px; }
+.how-x { position: absolute; top: 4px; right: 6px; width: 20px; height: 20px; color: var(--t3); font-size: 15px; }
+.how-x:hover { color: var(--t1); }
+.stot { display: flex; justify-content: space-between; align-items: baseline; margin-top: 16px; font-size: 12.5px; color: var(--t3); }
+.stot b { font-size: 15px; font-weight: 600; color: var(--t1); margin-right: 2px; }
+.dbar { display: flex; height: 4px; margin-top: 6px; background: var(--line2); border-radius: 2px; overflow: hidden; }
+.dbar i { display: block; height: 100%; }
+.dbar .me, .dot.me { background: var(--t1); }
+.dbar .me { min-width: 2px; }
+.dbar .ot, .dot.ot { background: #5a6574; }
+.dlg { display: flex; gap: 14px; margin: 4px 0 14px; font-size: 11.5px; color: var(--t3); }
+.dlg span { display: flex; align-items: center; }
+.dlg .dot { width: 6px; height: 6px; margin-right: 5px; }
+.dlg .r { margin-left: auto; }
+.sbar { display: flex; height: 10px; margin-top: 6px; background: var(--line2); border-radius: 2px; overflow: hidden; }
+.sbar i { display: block; height: 100%; }
+.slg { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; margin: 7px 0 2px; font-size: 12px; color: var(--t3); }
+.slg span { display: flex; align-items: center; }
+.slg b { color: var(--t1); font-weight: 600; margin-left: 4px; }
+.lnk { color: var(--accent); font-size: 12px; margin-left: 8px; }
+.lnk:hover { text-decoration: underline; }
+.selhint { font-size: 12px; color: var(--t3); margin-right: 8px; }
+#sbar { position: sticky; top: 0; z-index: 3; background: var(--bg); margin: 0 -24px; padding: 0 24px 2px; }
+#sbar.stuck { border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+#sbar .stot { padding-top: 16px; margin-top: 0; }
+.pfilt { padding: 0 10px; margin-top: 0; }
+.pyr { display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 10px; border-top: 1px solid var(--line); background: var(--raise); font-size: 12px; color: var(--t3); cursor: pointer; user-select: none; }
+.pyr b { color: var(--t1); font-weight: 600; font-size: 12.5px; }
+.pyr::before { content: ""; width: 0; height: 0; border: 4px solid transparent; border-top-color: var(--t3); border-bottom-width: 0; margin-top: 1px; }
+.pyr.shut::before { border: 4px solid transparent; border-left-color: var(--t3); border-right-width: 0; margin: 0 1px 0 1px; }
+.pyr:hover { color: var(--t2); }
+.pyr:first-child { border-top: 0; }
+.ssrch { margin: 0 4px 10px; }
+.ssrch .input { width: 100%; }
+.snav button.none { opacity: .4; }
+.srch .sgrp { display: block; margin-bottom: 22px; }
+.srch .sgrp.nohit { display: none; }
+.srch .sgrp > :not(h1):not(.form), .srch .opt.nohit, .srch .form > :not(.opt) { display: none; }
+.srch .sgrp h1 { font-size: 13px; color: var(--t3); margin-bottom: 6px; }
+.snone { display: none; padding: 30px 0; text-align: center; color: var(--t3); font-size: 12.5px; }
+.srch .snone.on { display: block; }
+
+/* little ? next to a label. hover it for the long version */
+.q { display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 6px; font-size: 10.5px; font-style: normal; font-weight: 700; color: var(--t3); border: 1px solid var(--line2); border-radius: 50%; cursor: help; position: relative; flex-shrink: 0; }
+.q:hover { color: var(--t1); border-color: #4a5664; }
+.q:hover::after {
+  content: attr(data-tip); position: absolute; left: -8px; top: calc(100% + 6px); width: 280px; padding: 8px 10px;
+  font-size: 12px; font-weight: 400; line-height: 1.5; color: var(--t2); text-align: left; white-space: normal;
+  background: var(--raise); border: 1px solid var(--line2); border-radius: 3px; box-shadow: 0 8px 24px rgba(0,0,0,.45); z-index: 50; pointer-events: none;
+}
+.prow.hd .q:hover::after { left: auto; right: -40px; }
 
 .form { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; }
-.frow { display: grid; grid-template-columns: 220px 1fr; gap: 24px; padding: 16px; border-top: 1px solid var(--line); }
-.frow:first-child { border-top: 0; }
-.frow h3 { font-size: 13px; font-weight: 600; color: var(--t1); }
-.frow p { font-size: 12px; color: var(--t3); margin-top: 2px; line-height: 1.5; }
+
+/* settings */
+.snav { width: 190px; flex-shrink: 0; padding: 14px 8px; background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 1px; overflow-y: auto; }
+.snav button { text-align: left; height: 32px; padding: 0 12px; font-weight: 500; color: var(--t3); border-left: 2px solid transparent; }
+.snav button:hover { color: var(--t2); background: var(--raise); }
+.snav button.on { color: var(--t1); background: var(--hover); border-left-color: var(--accent); }
+.sp { max-width: 760px; margin: 0; }
+.sgrp { display: none; }
+.sgrp.on { display: block; }
+.sgrp h1 { font-size: 17px; font-weight: 600; color: var(--t1); margin-bottom: 14px; }
+.slead { font-size: 12.5px; color: var(--t3); line-height: 1.5; margin: -10px 0 14px; max-width: 620px; }
+.shd { font-size: 12px; font-weight: 600; color: var(--t3); margin: 22px 0 8px; }
+.opt { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px 24px; align-items: center; padding: 12px 16px; border-top: 1px solid var(--line); }
+.opt:first-child { border-top: 0; }
+.opt.col { grid-template-columns: minmax(0,1fr); }
+.opt h3 { display: flex; align-items: center; font-size: 13px; font-weight: 600; color: var(--t1); }
+.opt p { font-size: 12px; color: var(--t3); margin-top: 2px; line-height: 1.5; }
+.opt .cache-info { margin: 4px 0 0; }
+.opt .plist { margin-top: 0; }
+.sw { appearance: none; -webkit-appearance: none; width: 32px; height: 18px; margin: 0; border-radius: 9px; background: var(--line2); position: relative; cursor: pointer; transition: background .12s; }
+.sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--t2); transition: left .12s; }
+.sw:checked { background: var(--accent); }
+.sw:checked::after { left: 16px; background: #0b0f14; }
+.about { margin-top: 22px; font-size: 12.5px; color: var(--t2); }
 .inl { display: flex; gap: 6px; align-items: center; }
 .hint { font-size: 12px; color: var(--t3); margin-top: 6px; }
 .hint b { color: var(--accent); font-weight: 600; }
@@ -410,6 +504,12 @@ tr.me .pl-n { color: var(--accent); }
 .upd span { margin-right: auto; }
 .toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); padding: 7px 14px; font-size: 12.5px; color: var(--t1); background: var(--raise); border: 1px solid var(--line2); border-radius: 3px; opacity: 0; transition: opacity .15s; pointer-events: none; z-index: 300; }
 .toast.on { opacity: 1; }
+/* press feedback. things dip a touch while held, and a small ring opens where you clicked */
+.btn:active:not(:disabled), .tabs button:active, .dtabs > button:active, .filters button:active, #snav button:active { transform: translateY(1px); }
+.row:active, .prow[data-i]:active, .pyr:active, .plist > div:active { filter: brightness(.9); }
+.tap { position: fixed; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,.45); pointer-events: none; z-index: 400; animation: tap .38s ease-out forwards; }
+@keyframes tap { from { transform: scale(.35); opacity: 1; } to { transform: scale(1.15); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .tap { display: none; } }
 </style>
 </head>
 <body>
@@ -478,137 +578,190 @@ tr.me .pl-n { color: var(--accent); }
 
   <section id="patches" class="pnl">
     <div class="page"><div class="page-in">
-      <div class="ph"><h1>Patches</h1><div class="r"><button class="btn" id="clear-ready-btn" disabled onclick="clearReady()">Clear ready files</button><button class="btn" onclick="addPatch()">Add from install...</button></div></div>
+      <div class="ph"><h1>Patches</h1><div class="r"><button class="btn" id="how-btn" style="display:none" onclick="showHow(true)">How does this work?</button><button class="btn" onclick="addPatch()" title="Save the patch a League install is on right now">Add from install...</button></div></div>
+      <div class="how" id="how">
+        <div><b><i class="dot sv"></i>Saved</b>A packed copy of a patch. You need it to watch replays from that patch.</div>
+        <div><b><i class="dot rd"></i>Ready</b>Unpacked so League can run it, and its replays start straight away. Takes a few GB, safe to clear.</div>
+        <div><b><i class="dot ms"></i>Not saved</b>Replays from it can't be watched until you add that patch's game files.</div>
+        <button class="how-x" onclick="showHow(false)" title="Hide this">&times;</button>
+      </div>
+      <div id="sbar"></div>
       <div class="pmeta" id="p-meta"></div>
       <div id="save-banner"></div>
       <div id="store"></div>
+      <div id="tidy"></div>
       <div class="tbl">
         <div class="tbl-bar">
-          <h2>Stored<span id="p-count"></span></h2>
-          <button class="btn" id="rst-btn" disabled onclick="restorePatch()">Prepare</button>
-          <button class="btn" id="exp-btn" disabled onclick="expPatches()">Export...</button>
+          <h2>Your patches<span id="p-count"></span></h2>
+          <span class="selhint" id="p-sel"></span>
+          <button class="btn" id="rst-btn" disabled onclick="restorePatch()">Get ready</button>
+          <button class="btn" id="exp-btn" disabled onclick="expPatches()" title="Unpacks a full copy into a folder you pick, to back it up or move it">Export...</button>
           <button class="btn danger" id="drop-btn" disabled onclick="dropPatches()">Delete</button>
         </div>
-        <div class="prow hd"><span></span><span>Patch</span><span></span><span>Replays</span><span title="Total size, and what deleting it would free">Size</span><span></span></div>
+        <div class="filters pfilt" id="p-filt">
+          <button class="on" data-f="saved">Saved<span id="pf-saved"></span></button>
+          <button data-f="ready">Ready<span id="pf-ready"></span></button>
+          <button data-f="miss">Not saved<span id="pf-miss"></span></button>
+          <button data-f="all">All<span id="pf-all"></span></button>
+        </div>
+        <div class="prow hd"><span></span><span>Patch</span><span>Replays</span><span>Last game</span><span style="display:flex;align-items:center">Size<i class="q" data-tip="Patches share most of their files, so the size counts shared files too. Frees is what you'd actually get back by deleting it.">?</i></span><span>Status</span></div>
         <div id="p-list"></div>
-      </div>
-      <div class="tbl" id="miss-grp" style="display:none">
-        <div class="tbl-bar"><h2>Needed by replays<span>not stored</span></h2></div>
-        <div class="prow hd"><span></span><span>Patch</span><span></span><span>Replays</span><span></span><span></span></div>
-        <div id="miss-list"></div>
-        <div class="note">A patch can only be stored while it's the installed version. Keep L-Recall running and new patches are stored automatically after each update.</div>
+        <div class="note" id="miss-note" style="display:none"><b>Why are some not saved?</b> L-Recall only saves the patch League is on right now by itself, and only while it's running. For an older patch you need that patch's game files, however you got them. Use Add from install and pick its League of Legends.exe.</div>
       </div>
     </div></div>
   </section>
 
   <section id="settings" class="pnl">
-    <div class="page"><div class="page-in">
-      <div class="ph" style="margin-bottom:16px"><h1>Settings</h1></div>
-      <div class="form">
-        <div class="frow">
-          <div><h3>Riot ID</h3><p>Your account name, so wins, losses and your champion show from your side. Got more than one account? Separate them with commas.</p></div>
-          <div>
-            <div class="inl"><input class="input" id="me-inp" placeholder="Name#TAG" spellcheck="false"><button class="btn" onclick="saveMe()">Save</button></div>
-            <div class="hint" id="me-det"></div>
+    <nav class="snav" id="snav">
+      <div class="ssrch"><input class="input" id="s-srch" type="text" placeholder="Search settings" spellcheck="false" oninput="srchSet()" onkeydown="if(event.key==='Escape'){this.value='';srchSet();this.blur()}"></div>
+      <button data-s="general" class="on">General</button>
+      <button data-s="saving">Saving patches</button>
+      <button data-s="watch">Watching replays</button>
+      <button data-s="icons">Icons</button>
+      <button data-s="vanguard">Vanguard</button>
+      <button data-s="app">Updates and about</button>
+    </nav>
+    <div class="page"><div class="page-in sp" id="s-page">
+      <div class="snone" id="s-none">Nothing in settings matches that.</div>
+
+      <div class="sgrp on" id="s-general">
+        <h1>General</h1>
+        <div class="form">
+          <div class="opt col">
+            <div><h3>Riot ID<i class="q" data-tip="Got more than one account? Separate them with commas. Leave it empty and L-Recall guesses from your replays.">?</i></h3><p>So wins, losses and your champion show from your side.</p></div>
+            <div><div class="inl"><input class="input" id="me-inp" placeholder="Name#TAG" spellcheck="false"><button class="btn" onclick="saveMe()">Save</button></div><div class="hint" id="me-det"></div></div>
+          </div>
+          <div class="opt col">
+            <div><h3>Replay folders</h3><p>Where your replays (.rofl files) are. Folders inside these count too.</p></div>
+            <div><div class="plist" id="fl-list"></div><div class="inl"><button class="btn" onclick="addFolder()">Add...</button><button class="btn" id="rm-fl-btn" disabled onclick="rmFolder()">Remove</button></div></div>
           </div>
         </div>
-        <div class="frow">
-          <div><h3>Replay folders</h3><p>Where L-Recall looks for your replays (.rofl files). Folders inside these are checked too.</p></div>
-          <div>
-            <div class="plist" id="fl-list"></div>
-            <div class="inl"><button class="btn" onclick="addFolder()">Add...</button><button class="btn" id="rm-fl-btn" disabled onclick="rmFolder()">Remove</button></div>
+      </div>
+
+      <div class="sgrp" id="s-saving">
+        <h1>Saving patches</h1>
+        <p class="slead">An old replay only plays on its own patch, so L-Recall saves a copy of each patch from your League install when Riot updates.</p>
+        <div class="form">
+          <div class="opt col">
+            <div><h3>League installs<i class="q" data-tip="Checked every hour. Saving waits until Riot's finished updating, and pauses if you start a game. Double-click an install to show it in Explorer.">?</i></h3><p>Where patches get saved from.</p></div>
+            <div><div class="plist" id="gp-list"></div><div class="inl"><button class="btn" onclick="findGP()" title="Look for League installs on this PC">Find</button><button class="btn" onclick="addGP()">Add...</button><button class="btn" id="rm-gp-btn" disabled onclick="rmGP()">Remove</button></div></div>
+          </div>
+          <div class="opt">
+            <div><h3>Save new patches automatically</h3><p>When it's off, nothing gets saved until you hit Save it now on the Patches tab.</p></div>
+            <input type="checkbox" class="sw" id="save-new" onchange="setReplayStart({ save_new: this.checked })">
+          </div>
+          <div class="opt col">
+            <div><h3>Storage folder<i class="q" data-tip="The first patch takes about 20 GB. Patches share most of their files, so each one after that usually adds a few hundred MB.">?</i></h3><p>Where saved patches are kept. Pick a drive with room.</p></div>
+            <div><div class="inl"><div class="path" id="repo-path"></div><button class="btn" onclick="pickRepo()">Change...</button></div><div class="hint bad" id="repo-note"></div></div>
           </div>
         </div>
-        <div class="frow">
-          <div><h3>Game installs</h3><p>Your League install. Every hour L-Recall checks it, and once Riot's finished updating, it saves a copy of the new patch.</p></div>
-          <div>
-            <div class="plist" id="gp-list"></div>
-            <div class="inl"><button class="btn" onclick="findGP()" title="Look for League installs on this PC">Find</button><button class="btn" onclick="addGP()">Add...</button><button class="btn" id="rm-gp-btn" disabled onclick="rmGP()">Remove</button></div>
-            <label class="check"><input type="checkbox" id="save-new" onchange="setReplayStart({ save_new: this.checked })"> Save new patches automatically</label>
-            <div class="hint">When it's off, nothing gets saved until you hit Save it now on the Patches tab.</div>
+        <h2 class="shd">If something's wrong</h2>
+        <div class="form">
+          <div class="opt"><div><h3>Check storage</h3><p>Makes sure every saved patch still matches the original game files. Safe to stop.</p></div><button class="btn" onclick="checkStorage()">Check</button></div>
+          <div class="opt"><div><h3>Rearrange storage</h3><p>Tidies the saved files so patches get ready faster. Takes a few minutes, safe to stop.</p></div><button class="btn" onclick="repackStorage()">Rearrange</button></div>
+        </div>
+      </div>
+
+      <div class="sgrp" id="s-watch">
+        <h1>Watching replays</h1>
+        <p class="slead">Before a replay plays, its saved patch gets unpacked so League can run it. That's the ready patch. It takes half a minute to a few minutes, depending on your drive.</p>
+        <div class="form">
+          <div class="opt">
+            <div><h3>Only unpack what the replay needs<i class="q" data-tip="Just the champions and map in the replay. Everything else is left as Riot's empty placeholder files. If a replay doesn't start, L-Recall unpacks the rest and tries again by itself.">?</i></h3><p>Around 5 GB instead of 30, and replays start sooner.</p></div>
+            <input type="checkbox" class="sw" id="quick-chk" onchange="setReplayStart({ quick: this.checked })">
+          </div>
+          <div class="opt">
+            <div><h3>Patches kept ready<i class="q" data-tip="With 1, switching patch updates it in place and only redoes what changed. More makes going back to a recent patch instant.">?</i></h3><p>Each extra one takes several GB.</p></div>
+            <select class="input" id="keep-sel" style="width:auto" onchange="setReplayStart({ keep: +this.value })">
+              <option value="1">1, least space</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
+          </div>
+          <div class="opt">
+            <div><h3>Get the newest patch ready in the background</h3><p>So your latest replays start sooner. Only while you're not playing.</p></div>
+            <input type="checkbox" class="sw" id="prep-newest" onchange="setReplayStart({ newest: this.checked })">
+          </div>
+          <div class="opt">
+            <div><h3>Use my League settings</h3><p>Your graphics, camera and hotkeys instead of the game's defaults.</p></div>
+            <input type="checkbox" class="sw" id="my-settings" onchange="setReplayStart({ settings: this.checked })">
+          </div>
+          <div class="opt">
+            <div><h3>Clear ready files when L-Recall closes</h3><p>Gets the space back. The next replay takes a bit longer to start.</p></div>
+            <input type="checkbox" class="sw" id="clear-exit" onchange="setReplayStart({ clear_on_exit: this.checked })">
+          </div>
+          <div class="opt">
+            <div><h3>Drive type<i class="q" data-tip="Lots of files at once on NVMe, a few on a SATA SSD, one long read at a time on a hard drive.">?</i></h3><p id="drive-hint">Changes how patches get unpacked. Leave it on Auto unless it guessed wrong.</p></div>
+            <select class="input" id="drive-sel" style="width:auto" onchange="setReplayStart({ drive: this.value })">
+              <option value="">Auto</option><option value="nvme">NVMe SSD</option><option value="ssd">SATA SSD</option><option value="hdd">Hard drive</option></select>
           </div>
         </div>
-        <div class="frow">
-          <div><h3>Patch storage</h3><p>Where saved patches are kept. Patches share most of their files, so the next one usually only adds a few hundred MB.</p></div>
-          <div>
-            <div class="inl"><div class="path" id="repo-path"></div><button class="btn" onclick="pickRepo()">Change...</button></div>
-            <div class="hint bad" id="repo-note"></div>
-            <div class="inl" style="margin-top:10px"><button class="btn" onclick="repackStorage()">Rearrange storage</button><button class="btn" onclick="checkStorage()">Check storage</button></div>
-            <div class="hint">Rearrange storage tidies the saved files so patches get ready faster. Check storage makes sure every saved patch still matches the original game files. Both take a few minutes and are safe to stop.</div>
-          </div>
-        </div>
-        <div class="frow">
-          <div><h3>Watching replays</h3><p>Before an old replay plays, its patch gets put back together from storage. That takes anywhere from half a minute to a few minutes, depending on your drive.</p></div>
-          <div>
-            <label class="check" style="margin-top:0"><input type="checkbox" id="quick-chk" onchange="setReplayStart({ quick: this.checked })"> Only build what the replay needs</label>
-            <div class="hint">Just the champions and map in the replay, so the ready patch is around 4 to 6 GB instead of 30, and replays start sooner. Everything else (other champions, other maps, TFT) is left as Riot's empty placeholder files, and gets cleared again when you watch something that doesn't need it. If a replay doesn't start, it builds the rest and tries again by itself.</div>
-            <div class="inl" style="margin-top:10px"><select class="input" id="keep-sel" style="width:auto" onchange="setReplayStart({ keep: +this.value })">
-              <option value="1">Keep 1 patch ready</option><option value="2">Keep 2 patches ready</option>
-              <option value="3">Keep 3 patches ready</option><option value="4">Keep 4 patches ready</option></select></div>
-            <div class="hint">1 uses the least space. Switching patch then updates it in place, rebuilding only what changed. Keeping more makes going back to a recent patch instant, but each extra one takes several GB.</div>
-            <label class="check"><input type="checkbox" id="prep-newest" onchange="setReplayStart({ newest: this.checked })"> Get the newest patch ready in the background</label>
-            <div class="hint">So your latest replays start sooner. Only while you're not playing, and never in place of a patch you got ready yourself.</div>
-            <label class="check"><input type="checkbox" id="my-settings" onchange="setReplayStart({ settings: this.checked })"> Use my League settings in replays</label>
-            <div class="hint">Your graphics, camera and hotkeys, copied from your League install each time a replay starts, instead of the game's defaults.</div>
-            <label class="check"><input type="checkbox" id="clear-exit" onchange="setReplayStart({ clear_on_exit: this.checked })"> Clear the ready files when L-Recall closes</label>
-            <div class="hint">Gets back the space the ready patch takes whenever you exit from the tray. Your saved patches stay, the next replay just takes a bit longer to start.</div>
-            <div class="inl" style="margin-top:10px"><select class="input" id="drive-sel" style="width:auto" onchange="setReplayStart({ drive: this.value })">
-              <option value="">Storage drive: work it out</option><option value="nvme">Storage drive: NVMe SSD</option>
-              <option value="ssd">Storage drive: SATA SSD</option><option value="hdd">Storage drive: Hard drive</option></select></div>
-            <div class="hint" id="drive-hint">Patches get built differently on each: lots at once on NVMe, a few on a SATA SSD, and one long straight read at a time on a hard drive.</div>
-          </div>
-        </div>
-        <div class="frow">
-          <div><h3>Champion &amp; item icons</h3><p>The little pictures in the replay list. Saved on your PC so they show up fast, even offline.</p></div>
-          <div>
-            <div class="cache-info" id="dd-info">...</div>
+      </div>
+
+      <div class="sgrp" id="s-icons">
+        <h1>Icons</h1>
+        <p class="slead">The champion and item pictures. Kept on your PC so they show up fast, even offline.</p>
+        <div class="form">
+          <div class="opt col">
+            <div><h3>Saved icons</h3><div class="cache-info" id="dd-info">...</div></div>
             <div class="inl">
               <button class="btn" onclick="ddDownload()" title="Everything for the current patch, plus the exact icons each of your replays needs from its own patch">Download for my replays</button>
               <button class="btn" onclick="ddRefresh()" title="Check for a newer patch and fill in anything missing">Refresh</button>
               <button class="btn danger" onclick="ddClear()">Clear</button>
             </div>
-            <label class="check"><input type="checkbox" id="dd-auto" onchange="ddAuto(this.checked)"> Get icons for new patches automatically</label>
+          </div>
+          <div class="opt">
+            <div><h3>Get icons for new patches automatically</h3><p>Downloads them when a new patch comes out.</p></div>
+            <input type="checkbox" class="sw" id="dd-auto" onchange="ddAuto(this.checked)">
           </div>
         </div>
-        <div class="frow">
-          <div><h3>Riot Vanguard</h3><p>Turn on Vanguard's Pre-Check if you can. It switches Vanguard on only when a game starts. Without it, Vanguard stays on all the time and stops replays from opening, so you'd have to exit it from its tray icon before watching.</p></div>
-          <div>
-            <div class="cache-info" id="vg-info">...</div>
-            <p class="legal" style="margin-top:0">L-Recall only reads Vanguard's status. It never changes it or tries to get around it.</p>
-            <div class="inl" style="margin-top:8px"><button class="btn" onclick="openLink('https://support.riotgames.com/en-us/league-of-legends/performance/riot-vanguard-faq-league-of-legends')">Riot's Vanguard FAQ</button></div>
+      </div>
+
+      <div class="sgrp" id="s-vanguard">
+        <h1>Riot Vanguard</h1>
+        <p class="slead">Riot's anti-cheat. If it's running all the time, replays won't open.</p>
+        <div class="form">
+          <div class="opt col"><div><h3>Status</h3><div class="cache-info" id="vg-info">...</div></div></div>
+          <div class="opt">
+            <div><h3>Use Pre-Check if you can</h3><p>Vanguard then only switches on while a game's running, so replays open fine. Without it, exit Vanguard from its tray icon before watching.</p></div>
+            <button class="btn" onclick="openLink('https://support.riotgames.com/en-us/league-of-legends/performance/riot-vanguard-faq-league-of-legends')">Riot's Vanguard FAQ</button>
           </div>
         </div>
-        <div class="frow">
-          <div><h3>Updates</h3><p>Checks GitHub for a newer version every now and then. Nothing about you is sent.</p></div>
-          <div>
-            <div class="cache-info" id="upd-info">...</div>
+        <p class="legal">L-Recall only reads Vanguard's status. It never changes it or tries to get around it.</p>
+      </div>
+
+      <div class="sgrp" id="s-app">
+        <h1>Updates and about</h1>
+        <div class="form">
+          <div class="opt col">
+            <div><h3>Updates<i class="q" data-tip="It only asks GitHub what the latest version is. Nothing about you is sent.">?</i></h3><div class="cache-info" id="upd-info">...</div></div>
             <div class="inl">
               <button class="btn" onclick="updCheckNow()">Check now</button>
               <button class="btn primary" id="upd-get" style="display:none" onclick="updInstall()">Update now</button>
               <button class="btn" id="upd-get-gh" style="display:none" onclick="updDownload()" title="Opens the release page, where you can read what changed and download the zip yourself">Get it from GitHub</button>
             </div>
-            <label class="check"><input type="checkbox" id="upd-auto" onchange="updAuto(this.checked)"> Check for updates automatically</label>
+          </div>
+          <div class="opt">
+            <div><h3>Check for updates automatically</h3><p>Every now and then, in the background.</p></div>
+            <input type="checkbox" class="sw" id="upd-auto" onchange="updAuto(this.checked)">
+          </div>
+          <div class="opt">
+            <div><h3>Problem report</h3><p>Something broken? Zips your recent logs into Downloads, with your username taken out, so you can send them to whoever's helping.</p></div>
+            <button class="btn" onclick="reportProblem()">Save report</button>
           </div>
         </div>
-        <div class="frow">
-          <div><h3>Uninstall</h3><p>Removes L-Recall from this PC. Your replays are never touched, and saved patches stay unless you tick the box.</p></div>
-          <div>
-            <div class="cache-info" id="un-info">...</div>
-            <div class="inl"><button class="btn danger" onclick="uninstallApp()">Uninstall L-Recall...</button></div>
-            <label class="check"><input type="checkbox" id="un-patches"> Also delete stored patches</label>
+        <h2 class="shd">Uninstall</h2>
+        <div class="form">
+          <div class="opt col">
+            <div><h3>Uninstall L-Recall</h3><p>Your replays are never touched. Saved patches stay unless you tick the box.</p><div class="cache-info" id="un-info">...</div></div>
+            <div><div class="inl"><button class="btn danger" onclick="uninstallApp()">Uninstall L-Recall...</button></div>
+            <label class="check"><input type="checkbox" id="un-patches"> Also delete saved patches</label></div>
           </div>
         </div>
-        <div class="frow">
-          <div><h3>About</h3><p>Version <span id="about-ver">1.0.0</span> · based on League VCS by Pranav Nutalapati</p></div>
-          <div>
-            <div class="inl">
-              <button class="btn" onclick="openLink('https://github.com/EmberLynxe/L-Recall')">GitHub</button>
-              <button class="btn" onclick="reportProblem()" title="Zips your last few logs into Downloads, with your username taken out, so you can send them to whoever's helping">Save a problem report</button>
-            </div>
-            <p class="legal">L-Recall isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.</p>
-          </div>
+        <div class="about">
+          <div>L-Recall <span id="about-ver">1.0.0</span> · based on League VCS by Pranav Nutalapati</div>
+          <div class="inl" style="margin-top:8px"><button class="btn" onclick="openLink('https://github.com/EmberLynxe/L-Recall')">GitHub</button></div>
+          <p class="legal">L-Recall isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.</p>
         </div>
       </div>
+
     </div></div>
   </section>
 </div>
@@ -767,7 +920,7 @@ async function call(action, args = {}) {
 const $ = id => document.getElementById(id);
 function esc(s) {
   if (s === null || s === undefined) return '';
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 const fmtK = n => { n = n || 0; return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n); };
 const ratio = (k, d, a) => d === 0 ? 'Perfect' : ((k + a) / d).toFixed(2) + ':1';
@@ -793,6 +946,15 @@ let champNames = { monkeyking: 'Wukong', aurelionsol: 'Aurelion Sol', belveth: "
   reksai: "Rek'Sai", renata: 'Renata Glasc', tahmkench: 'Tahm Kench', twistedfate: 'Twisted Fate', velkoz: "Vel'Koz",
   xinzhao: 'Xin Zhao', fiddlesticks: 'Fiddlesticks' };
 const cname = c => champNames[(c || '').toLowerCase()] || c;
+// what people see for a patch, same rule as show() in python: no build numbers, and the year names riot
+// switched to in 2025 (game 15.x is 25.x, 16.x is 26.x). r.patch stays the raw game version, data dragon needs it
+function pv(v) {
+  const m = /^(\d+)\.(\d+)/.exec(String(v || ''));
+  if (!m) return String(v || '');
+  const major = +m[1];
+  return (major >= 15 && major <= 24 ? major + 10 : major) + '.' + m[2];
+}
+const shortV = pv;
 function verFor(patch) { return ddVersions.find(v => v === patch || v.startsWith(patch + '.')) || ddVersions[0] || ''; }
 const latest = () => ddVersions[0] || '';
 // on disk first. an older patch that isn't cached yet borrows the newest cached icon, which is
@@ -873,6 +1035,8 @@ async function showApp() {
   checkUpdate(false);
   pollSave();
   setInterval(pollSave, 2000);
+  pollLol();
+  setInterval(pollLol, 5000);
 }
 
 // setup
@@ -906,13 +1070,18 @@ async function saveSu() {
 }
 
 // tabs
+(() => {
+  const pg = $('sbar').closest('.page');
+  pg.addEventListener('scroll', () => $('sbar').classList.toggle('stuck', pg.scrollTop > 0 && $('sbar').getBoundingClientRect().top - pg.getBoundingClientRect().top < 1), { passive: true });
+})();
 function showTab(name) {
   document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === name));
   document.querySelectorAll('.pnl').forEach(p => p.classList.toggle('on', p.id === name));
   if (name === 'patches') loadP();
   if (name === 'settings') loadSettings();
 }
-document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+// clicking the tab you're already on used to reload it
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => { if (!b.classList.contains('on')) showTab(b.dataset.tab); }));
 
 // who am i
 const pkey = p => ((p.n ?? p.name ?? '') + '#' + (p.t ?? p.tag ?? '')).toLowerCase();
@@ -962,11 +1131,22 @@ async function loadR() {
     else renderEmptyDetail();
   }
 }
+// in game or not, and the patch league is on. polled, the process list is a cheap snapshot
+let lolState = null;
+async function pollLol() {
+  try { lolState = await call('game_status'); } catch (e) { return; }
+  updateTopStat();
+}
+function lolHTML() {
+  if (!lolState || !lolState.version) return '';
+  return '<span class="lol' + (lolState.running ? ' on' : '') + '" title="' + (lolState.running ? 'A game is open right now' : 'No game open') +
+    '"><i></i>' + (lolState.running ? 'In game' : 'League') + ' · <b style="margin-left:4px">' + esc(pv(lolState.version)) + '</b></span>';
+}
 function updateTopStat() {
-  $('top-stat').innerHTML = '<span><b>' + replays.length + '</b> replays</span>' +
+  $('top-stat').innerHTML = lolHTML() + '<span><b>' + replays.length + '</b> replays</span>' +
     (repoOk ? '<span><b>' + stored.length + '</b> patches stored</span>'
-            : '<span class="warn" onclick="showTab(\'settings\')">Patch storage not found</span>') +
-    (saveState ? '<span class="warn" style="cursor:pointer" onclick="showTab(\'patches\')">Saving ' + esc(saveState.version) + ' · ' + saveState.percent + '%</span>' : '');
+            : '<span class="warn" onclick="showSet(\'saving\')">Patch storage not found</span>') +
+    (saveState ? '<span class="warn" style="cursor:pointer" onclick="showTab(\'patches\')">Saving ' + esc(pv(saveState.version)) + ' · ' + saveState.percent + '%</span>' : '');
 }
 
 // saving a new patch happens in the background. it used to be invisible, so a fresh install looked like it
@@ -983,7 +1163,7 @@ async function pollSave() {
 function renderSaveBanner() {
   const el = $('save-banner'); if (!el) return;
   if (saveState) {
-    el.innerHTML = '<div class="banner"><div class="txt"><b>Saving patch ' + esc(saveState.version) + '</b> in the background, ' + saveState.percent +
+    el.innerHTML = '<div class="banner"><div class="txt"><b>Saving patch ' + esc(pv(saveState.version)) + '</b> in the background, ' + saveState.percent +
       '% done. Replays from it can be watched once it\'s finished. It pauses by itself if you start a game.' +
       '<div class="bar"><i style="width:' + saveState.percent + '%"></i></div></div>' +
       '<button class="btn" onclick="stopSaving()">Stop for now</button></div>';
@@ -992,7 +1172,7 @@ function renderSaveBanner() {
   const missing = ((lastStorage && lastStorage.installed) || []).filter(i => !i.saved);
   if (!missing.length) { el.innerHTML = ''; return; }
   const m = missing[0];
-  el.innerHTML = '<div class="banner"><div class="txt"><b>Your installed patch (' + esc(m.name) + ') isn\'t saved yet.</b> ' +
+  el.innerHTML = '<div class="banner"><div class="txt"><b>Your installed patch (' + esc(pv(m.name)) + ') isn\'t saved yet.</b> ' +
     (lastStorage.save_new_patches === false || config.save_new_patches === false
       ? 'Saving new patches is off, so it only gets saved if you ask. '
       : 'It gets saved on the next check, or you can start it now. ') +
@@ -1020,7 +1200,7 @@ function matchesQuery(r, q) {
   if (!q) return true;
   const tags = (r.tags || []).map(t => t.toLowerCase());
   if (q.startsWith('#')) return tags.some(t => t.startsWith(q.slice(1)));
-  return r.filename.toLowerCase().includes(q) || r.patch.includes(q) ||
+  return r.filename.toLowerCase().includes(q) || r.patch.includes(q) || pv(r.patch).includes(q) ||
     tags.some(t => t.includes(q)) || (r.note || '').toLowerCase().includes(q) ||
     r.players.some(p => p.c.toLowerCase().includes(q) || cname(p.c).toLowerCase().includes(q) || (p.n || '').toLowerCase().includes(q));
 }
@@ -1067,7 +1247,7 @@ function renderR() {
 
 function rowHTML(r, i, sel) {
   const me = r._me, res = resultOf(r);
-  const side = '<div class="side"><div class="tm">' + esc(timeOf(r.ts)) + '</div><div class="pt">' + esc(r.patch) +
+  const side = '<div class="side"><div class="tm">' + esc(timeOf(r.ts)) + '</div><div class="pt">' + esc(pv(r.patch)) +
     (r.status === 'Ready' ? '' : '<span class="nostore" title="This patch isn\'t stored">not stored</span>') + '</div></div>';
   if (me) {
     // both teams like op.gg, blue on top. you get the gold ring
@@ -1250,13 +1430,13 @@ function headHTML(r, d) {
   return '<div class="dhead ' + (res || '') + '">' + icon +
     '<div style="min-width:0"><div class="dh1">' + title + '</div>' +
       (line2 ? '<div class="dh2">' + line2 + '</div>' : '') + notice +
-      '<div class="dh3"><span>' + esc(r.duration) + '</span><span>Patch ' + esc(r.patch) + '</span><span title="File time. Replays don\'t record when the game started.">Saved ' + esc(fullDate(r.ts)) + '</span>' + (mi ? '<span>' + esc(mi.platform + ' ' + mi.id) + '</span>' : '') + '</div></div>' +
+      '<div class="dh3"><span>' + esc(r.duration) + '</span><span>Patch ' + esc(pv(r.patch)) + '</span><span title="File time. Replays don\'t record when the game started.">Saved ' + esc(fullDate(r.ts)) + '</span>' + (mi ? '<span>' + esc(mi.platform + ' ' + mi.id) + '</span>' : '') + '</div></div>' +
     '<div class="acts">' +
       '<button class="btn primary" ' + (ready ? '' : 'disabled ') + 'onclick="watchDet()">Watch</button>' +
       (mi && mi.log ? '<button class="btn" onclick="openLink(\'' + mi.log + '\')">League of Graphs</button>' : '') +
       '<button class="btn" onclick="showFile(detPath)">Show file</button>' +
     '</div>' +
-    (ready ? '' : '<div class="acts-note">Patch ' + esc(r.patch) + ' isn\'t stored, so this replay can\'t be played.</div>') +
+    (ready ? '' : '<div class="acts-note">Patch ' + esc(pv(r.patch)) + ' isn\'t stored, so this replay can\'t be played.</div>') +
   '</div>';
 }
 
@@ -1480,7 +1660,7 @@ async function watchPath(r) {
       const pf = await call('replay_preflight', { path: r.path });
       if (pf.message && !await cfmDlg(pf.message, pf.level === 'block' ? 'Launch anyway' : 'Watch anyway', false)) return;
     } catch (e) {}
-    openCon('Starting replay (patch ' + r.patch + ')', false);
+    openCon('Starting replay (patch ' + pv(r.patch) + ')', false);
   } finally {
     watchStarting = false;
   }
@@ -1540,14 +1720,15 @@ addEventListener('blur', closeCx);
 
 // patches
 async function loadP() {
+  applyHow();
+  if (!costsLoaded) { const o = seen('costs:' + config.repository); if (o) { costs = o; costsLoaded = true; } }
   loadStorage();
   $('p-list').innerHTML = '<div class="empty">Loading...</div>';
   selPI.clear(); updPB();
   try { patches = await call('get_patches'); } catch (e) { patches = []; }
   renderP();
 }
-const shortV = v => v.split('.').slice(0, 2).join('.');
-// one row per patch. every stored build of 16.19 is just 16.19, the app picks the right build itself
+// one row per patch. every stored build of 16.19 is just 26.19, the app picks the right build itself
 let pgroups = [];
 function groupPatches() {
   const by = {};
@@ -1560,36 +1741,134 @@ function groupPatches() {
   });
 }
 const replayCount = name => replays.filter(r => r.status === 'Ready' && shortV(r.version) === name).length;
+function lastGame(name) { let t = 0; for (const r of replays) if (r.version && shortV(r.version) === name && r.ts > t) t = r.ts; return t; }
+function ago(ts) {
+  if (!ts) return '';
+  const d = Math.floor((Date.now() / 1000 - ts) / 86400);
+  if (d < 1) return 'Today';
+  if (d < 2) return 'Yesterday';
+  if (d < 14) return d + ' days ago';
+  if (d < 60) return Math.floor(d / 7) + ' weeks ago';
+  if (d < 730) return Math.floor(d / 30) + ' months ago';
+  return Math.floor(d / 365) + ' years ago';
+}
+function pillFor(g) {
+  if (g.status === 'Active') return '<span class="pill rd" title="Unpacked in the game folder. Its replays start straight away.">Ready</span>';
+  if (g.status === 'Kept') return '<span class="pill rd" title="Kept unpacked on the side, so switching back to it is instant.">Ready</span>';
+  return '<span class="pill sv" title="Packed away. Its replays unpack it first, which takes a minute or so.">Saved</span>';
+}
+let missNeed = {};
 function renderP() {
   groupPatches();
+  const have = new Set(pgroups.map(g => g.name));
+  missNeed = {};
+  for (const r of replays) {
+    const v = r.version && shortV(r.version);
+    if (v && r.status !== 'Ready' && !have.has(v)) missNeed[v] = (missNeed[v] || 0) + 1;
+  }
+  const rows = pgroups.map((g, i) => ({ name: g.name, i })).concat(Object.keys(missNeed).map(name => ({ name, miss: true })));
+  rows.sort((a, b) => b.name.localeCompare(a.name, undefined, { numeric: true }));
   $('p-count').textContent = pgroups.length ? pgroups.length : '';
-  $('p-list').innerHTML = pgroups.length ? pgroups.map((g, i) => {
-    const n = replayCount(g.name);
-    return '<div class="prow' + (selPI.has(i) ? ' sel' : '') + '" data-i="' + i + '"><span class="chk"></span>' +
-      '<span class="v">' + esc(g.name) + '</span><span></span>' +
-      '<span>' + (n ? plural(n, 'replay') : '<span class="b">none</span>') + '</span>' +
-      '<span class="cost" data-v="' + esc(g.name) + '">' + costText(g.name) + '</span>' +
-      '<span class="st">' + (g.status === 'Active' ? 'Prepared' : g.status === 'Kept' ? 'Kept ready' : '') + '</span></div>';
-  }).join('') : '<div class="empty">No patches stored yet.</div>';
+  const isReady = x => !x.miss && !!pgroups[x.i].status;
+  const fc = { all: rows.length, saved: rows.filter(x => !x.miss).length, ready: rows.filter(isReady).length, miss: rows.filter(x => x.miss).length };
+  for (const k in fc) $('pf-' + k).textContent = fc[k];
+  $('p-filt').querySelector('[data-f=miss]').style.display = fc.miss || pfilt === 'miss' ? '' : 'none';
+  $('p-filt').querySelector('[data-f=ready]').style.display = fc.ready || pfilt === 'ready' ? '' : 'none';
+  $('p-filt').style.display = fc.saved !== fc.all || fc.ready ? '' : 'none';
+  $('p-filt').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.f === pfilt));
+  const shown = rows.filter(x => pfilt === 'all' || (pfilt === 'saved' ? !x.miss : pfilt === 'miss' ? x.miss : isReady(x)));
+  const shut = pyrShut();
+  let lastY = null;
+  $('p-list').innerHTML = shown.length ? shown.map(x => {
+    const y = patchYear(x.name);
+    let head = '';
+    if (y !== lastY) {
+      lastY = y;
+      const inY = shown.filter(z => patchYear(z.name) === y), m = inY.filter(z => z.miss).length;
+      head = '<div class="pyr' + (shut.has(y) ? ' shut' : '') + '" data-y="' + esc(y) + '"><b>' + esc(y) + '</b>' + [inY.length - m ? (inY.length - m) + (inY.length - m === 1 ? ' patch' : ' patches') + (m ? ' saved' : '') : '',
+        m ? m + ' not saved' : ''].filter(Boolean).join(' · ') + '</div>';
+    }
+    if (shut.has(y)) return head;
+    return head + patchRow(x);
+  }).join('') : rows.length ? '<div class="empty">None here.</div>'
+    : '<div class="empty"><b>No patches saved yet</b>The patch you have installed gets saved by itself. Or use Add from install.</div>';
+  $('miss-note').style.display = Object.keys(missNeed).length && pfilt !== 'saved' && pfilt !== 'ready' ? '' : 'none';
   loadCosts();
-
-  const need = {};
-  for (const r of replays) if (r.version && r.status !== 'Ready') need[shortV(r.version)] = (need[shortV(r.version)] || 0) + 1;
-  const miss = Object.keys(need).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
-  $('miss-grp').style.display = miss.length ? '' : 'none';
-  $('miss-list').innerHTML = miss.map(v => '<div class="prow"><span></span><span class="v">' + esc(v) + '</span><span></span><span>' + plural(need[v], 'replay') + '</span><span></span><span></span></div>').join('');
 }
-let costs = {};
+// riot went to year names in 2025. before that patch 14.x was 2024, 13.x 2023 and so on
+function patchYear(name) {
+  const m = parseInt(name, 10);
+  return isNaN(m) ? 'Other' : String(m >= 25 ? 2000 + m : 2010 + m);
+}
+function pyrShut() { try { return new Set(JSON.parse(localStorage.getItem('pyrShut') || '[]')); } catch (e) { return new Set(); } }
+let pfilt = 'saved';
+$('p-filt').addEventListener('click', e => { const b = e.target.closest('button[data-f]'); if (b && b.dataset.f !== pfilt) { pfilt = b.dataset.f; selPI.clear(); updPB(); renderP(); } });
+function patchRow(x) {
+    const t = ago(lastGame(x.name));
+    if (x.miss) return '<div class="prow miss"><span></span><span class="v">' + esc(x.name) + '</span><span>' + plural(missNeed[x.name], 'replay') + '</span>' +
+      '<span class="b">' + esc(t) + '</span><span class="b">-</span><span><span class="pill ms" title="This patch was never saved. Add its game files with Add from install to watch these.">Not saved</span></span></div>';
+    const g = pgroups[x.i], n = replayCount(g.name);
+    return '<div class="prow' + (selPI.has(x.i) ? ' sel' : '') + '" data-i="' + x.i + '"><span class="chk"></span>' +
+      '<span class="v">' + esc(g.name) + '</span>' +
+      '<span>' + (n ? plural(n, 'replay') : '<span class="b">none</span>') + '</span>' +
+      '<span class="b">' + esc(t) + '</span>' +
+      '<span class="cost" data-v="' + esc(g.name) + '">' + costText(g.name) + '</span>' +
+      '<span>' + pillFor(g) + '</span></div>';
+}
+// saved patches nobody has a replay on. never the newest or the installed one, new games land there
+let tidyIdx = [];
+function renderTidy() {
+  const el = $('tidy'); if (!el) return;
+  const inst = new Set(((lastStorage && lastStorage.installed) || []).map(i => shortV(String(i.name || ''))));
+  tidyIdx = replays.length ? pgroups.map((g, i) => i).filter(i => i > 0 && !inst.has(pgroups[i].name) && !replayCount(pgroups[i].name)) : [];
+  if (!tidyIdx.length) { el.innerHTML = ''; return; }
+  const one = tidyIdx.length === 1, frees = tidyIdx.reduce((s, i) => s + ((costs[pgroups[i].name] || {}).unique || 0), 0);
+  el.innerHTML = '<div class="banner"><div class="txt"><b>' + (one ? '1 saved patch has' : tidyIdx.length + ' saved patches have') + ' no replays.</b> ' +
+    (frees ? 'Deleting ' + (one ? 'it' : 'them') + ' frees at least ' + gbs(frees) + '.' : 'You can delete ' + (one ? 'it' : 'them') + ' if you don\'t need ' + (one ? 'it' : 'them') + '.') + '</div>' +
+    '<button class="btn" onclick="pickIdle()">Select ' + (one ? 'it' : 'them') + '</button></div>';
+}
+function pickIdle() {
+  selPI.clear(); tidyIdx.forEach(i => selPI.add(i));
+  document.querySelectorAll('#p-list .prow[data-i]').forEach(x => x.classList.toggle('sel', selPI.has(+x.dataset.i)));
+  updPB();
+}
+function showHow(on) {
+  try { on ? localStorage.removeItem('howHidden') : localStorage.setItem('howHidden', '1'); } catch (e) {}
+  applyHow();
+}
+function applyHow() {
+  let hidden = false;
+  try { hidden = !!localStorage.getItem('howHidden'); } catch (e) {}
+  $('how').style.display = hidden ? 'none' : '';
+  $('how-btn').style.display = hidden ? '' : 'none';
+}
+let costs = {}, costsLoaded = false;
+// remembers the last answer for things that are slow to work out, so the page has numbers straight away
+function seen(k, v) {
+  try {
+    if (v === undefined) return JSON.parse(localStorage.getItem('seen:' + k) || 'null');
+    localStorage.setItem('seen:' + k, JSON.stringify(v));
+  } catch (e) { return null; }
+}
 const gbs = n => n >= 1073741824 ? (n / 1073741824).toFixed(1) + ' GB' : (n / 1048576).toFixed(0) + ' MB';
 function costText(v) {
   const c = costs[v];
-  return c ? gbs(c.total) + ' <span>· frees ' + gbs(c.unique) + '</span>' : '<span>...</span>';
+  return c ? gbs(c.total) + ' <span>· frees ' + gbs(c.unique) + '</span>' : '<span>' + (costsLoaded ? '-' : 'Counting...') + '</span>';
 }
 async function loadCosts() {
-  try { costs = await call('get_patch_costs') || {}; } catch (e) { costs = {}; }
+  try { costs = await call('get_patch_costs') || {}; seen('costs:' + config.repository, costs); } catch (e) { if (!costsLoaded) costs = {}; }
+  costsLoaded = true;
   document.querySelectorAll('#p-list .cost').forEach(el => { el.innerHTML = costText(el.dataset.v); });
+  renderTidy(); updPB(); renderSbar(lastStorage);
 }
 $('p-list').addEventListener('click', e => {
+  const yr = e.target.closest('.pyr');
+  if (yr) {
+    const shut = pyrShut(), y = yr.dataset.y;
+    shut.has(y) ? shut.delete(y) : shut.add(y);
+    try { localStorage.setItem('pyrShut', JSON.stringify([...shut])); } catch (err) {}
+    selPI.clear(); updPB(); renderP(); return;
+  }
   const row = e.target.closest('.prow[data-i]'); if (!row) return;
   const i = +row.dataset.i;
   if (e.ctrlKey || e.metaKey || e.target.classList.contains('chk')) { selPI.has(i) ? selPI.delete(i) : selPI.add(i); }
@@ -1601,8 +1880,12 @@ function updPB() {
   const n = selPI.size;
   $('drop-btn').disabled = !n; $('exp-btn').disabled = !n; $('rst-btn').disabled = n !== 1;
   const g = n === 1 ? pgroups[[...selPI][0]] : null;
-  $('rst-btn').textContent = g && g.status === 'Active' ? 'Clear prepared files' : 'Prepare';
-  $('rst-btn').title = 'Build this patch ahead of time so its replays start instantly';
+  const active = g && g.status === 'Active';
+  $('rst-btn').textContent = active ? 'Clear ready files' : 'Get ready';
+  $('rst-btn').title = active ? 'Packs it away again to free the space. Its replays take a bit longer to start next time.'
+    : g && g.status === 'Kept' ? 'It\'s already unpacked on the side, so this is instant' : 'Unpacks it now, so its replays start straight away';
+  const fr = [...selPI].reduce((s, i) => s + (pgroups[i] && costs[pgroups[i].name] ? costs[pgroups[i].name].unique : 0), 0);
+  $('p-sel').textContent = n ? n + ' selected' + (fr ? ' · deleting frees at least ' + gbs(fr) : '') : 'Click a patch to pick it. Ctrl+click picks more.';
 }
 const selGroups = () => [...selPI].map(i => pgroups[i]).filter(Boolean);
 async function addPatch() {
@@ -1616,7 +1899,8 @@ async function dropPatches() {
   const gs = selGroups(); if (!gs.length) return;
   const names = gs.map(g => g.name).join(', ');
   const n = gs.reduce((s, g) => s + replayCount(g.name), 0);
-  const frees = gs.length === 1 && costs[gs[0].name] ? ' Frees about ' + gbs(costs[gs[0].name].unique) + '.' : '';
+  const fr = gs.reduce((s, g) => s + (costs[g.name] ? costs[g.name].unique : 0), 0);
+  const frees = fr ? ' Frees ' + (gs.length === 1 ? 'about ' : 'at least ') + gbs(fr) + '.' : '';
   if (!await cfmDlg('Delete patch ' + names + '?' + frees + (n ? ' ' + plural(n, 'replay') + ' will no longer be watchable.' : '') + ' This can\'t be undone.')) return;
   openCon('Deleting patch ' + names, true, false);
   await call('drop_patches', { patches: gs.flatMap(g => g.builds.map(b => b.version)) });
@@ -1631,7 +1915,7 @@ async function expPatches() {
 function restorePatch() { const a = [...selPI]; if (a.length === 1) doRestore(a[0]); }
 async function doRestore(i) {
   const g = pgroups[i]; if (!g) return;
-  openCon(g.status === 'Active' ? 'Clearing prepared patch ' + g.name : 'Preparing patch ' + g.name);
+  openCon(g.status === 'Active' ? 'Clearing ready files for ' + g.name : 'Getting patch ' + g.name + ' ready');
   // the build that's already ready if there is one, it's instant
   await call('restore_patch', { patch: g.active || g.kept || g.newest });
   loadP();
@@ -1642,24 +1926,27 @@ let storeSeq = 0;  // two loads close together used to both add their banners, a
 async function loadStorage() {
   const seq = ++storeSeq;
   const el = $('store');
-  el.innerHTML = ''; $('p-meta').textContent = '';
+  el.innerHTML = '';
+  // last numbers seen first, a sleepy hard drive can take a few seconds to answer
+  const was = seen('storage');
+  if (was && was.exists && was.path === config.repository) renderSbar(was);
+  else { $('p-meta').textContent = ''; $('sbar').innerHTML = ''; }
   let s;
   try { s = await call('get_storage'); } catch (e) { return; }
   if (seq !== storeSeq) return;
   lastStorage = s;
+  if (s.exists) seen('storage', { exists: true, path: s.path, total: s.total, ready: s.ready, used: s.used, free: s.free, disk: s.disk });
   renderSaveBanner();
   if (!s.exists) {
     el.innerHTML = '<div class="banner bad"><div class="txt"><b>Patch storage not found.</b> ' + (s.path ? esc(s.path) + ' isn\'t available.' : '') + '</div><button class="btn" onclick="pickRepo()">Choose folder...</button></div>';
     return;
   }
-  $('p-meta').textContent = gb(s.used) + ' used in ' + s.path + ' (' + gb(s.total) + ' saved patches, ' + gb(s.ready) +
-    ' ready to play) · ' + gb(s.free) + ' free';
-  $('clear-ready-btn').disabled = !(s.ready > 0);
-  $('clear-ready-btn').dataset.gb = gb(s.ready);
+  renderSbar(s);
+  renderTidy();
   if (s.space_warning && s.used > SPACE_WARN) {
     el.innerHTML = '<div class="banner" id="space-warn"><div class="txt"><b>L-Recall is using ' + gb(s.used) + '.</b> ' +
       'You can delete patches you don\'t need any more, or keep fewer ready to play in Settings.</div>' +
-      '<button class="btn" onclick="showTab(\'settings\')">Settings</button>' +
+      '<button class="btn" onclick="showSet(\'watch\')">Settings</button>' +
       '<button class="btn" onclick="ignoreSpace()">Don\'t warn me again</button></div>';
   }
   if (!s.needs_optimize) return;
@@ -1674,6 +1961,48 @@ async function loadStorage() {
     $('opt-btn').dataset.save = gb(est.current - est.after);
   } catch (e) { const o = $('opt-est'); if (o) o.textContent = ''; }
 }
+// thin one for the whole drive, to scale: L-Recall, everything else, free. older backends don't send the size
+function driveBar(s) {
+  if (!s.disk) return '';
+  const pc = n => Math.max(0, n / s.disk * 100), mine = s.total + s.ready, other = Math.max(0, s.disk - s.free - mine);
+  return '<div class="dbar" title="Whole drive, ' + gb(s.disk) + '"><i class="me" style="width:' + pc(mine) + '%" title="L-Recall: ' + gb(mine) + '"></i>' +
+    '<i class="ot" style="width:' + pc(other) + '%" title="Everything else on this drive: ' + gb(other) + '"></i></div>' +
+    '<div class="dlg"><span><i class="dot me"></i>L-Recall</span><span><i class="dot ot"></i>Other files ' + gb(other) + '</span><span><i class="dot fr"></i>Free</span><span class="r">' + gb(s.disk) + ' drive</span></div>';
+}
+// the bar is just L-Recall's space. most of it is files every patch shares, stored once, then each patch's own
+// little slice on top. that's the whole trick, so it's worth showing
+function renderSbar(s) {
+  if (!s || !s.exists) return;
+  const own = pgroups.map(g => ({ name: g.name, b: costs[g.name] ? costs[g.name].unique : 0 })).filter(x => x.b > 0);
+  const ownSum = own.reduce((t, x) => t + x.b, 0), shared = Math.max(0, s.total - ownSum);
+  const apart = pgroups.reduce((t, g) => t + (costs[g.name] ? costs[g.name].total : 0), 0);
+  const all = (s.total + s.ready) || 1, pc = n => n / all * 100;
+  const head = '<div class="stot"><span><b>' + gb(s.total + s.ready) + '</b> used by L-Recall</span><span>' + gb(s.free) + ' free on this drive</span></div>' + driveBar(s);
+  if (!costsLoaded) {
+    $('sbar').innerHTML = head + '<div class="sbar"><i class="sh" style="width:' + pc(s.total) + '%"></i><i class="rd" style="width:' + pc(s.ready) + '%"></i></div>' +
+      '<div class="slg"><span><i class="dot sh"></i>Saved patches<b>' + gb(s.total) + '</b></span><span>Working out what each patch takes...</span></div>';
+    $('p-meta').textContent = 'Kept in ' + s.path;
+    return;
+  }
+  $('sbar').innerHTML = head + '<div class="sbar">' +
+    (shared ? '<i class="sh" style="width:' + pc(shared) + '%" title="Shared by all patches: ' + gb(shared) + '"></i>' : '') +
+    own.map(x => '<i class="un" data-v="' + esc(x.name) + '" style="width:' + pc(x.b) + '%" title="Only ' + esc(x.name) + ': ' + gbs(x.b) + '"></i>').join('') +
+    (s.ready ? '<i class="rd" style="width:' + pc(s.ready) + '%" title="Ready to play: ' + gb(s.ready) + '"></i>' : '') + '</div>' +
+    '<div class="slg">' +
+    '<span><i class="dot sh"></i>Shared by all patches<b>' + gb(shared) + '</b></span>' +
+    '<span><i class="dot un"></i>Each patch\'s own files<b>' + gb(ownSum) + '</b>' +
+    '<i class="q" data-tip="Patches have most of their files in common, so those are kept once and shared. Each patch only adds the files that changed. Hover the bar to see each one.">?</i></span>' +
+    '<span><i class="dot rd"></i>Ready to play<b>' + gb(s.ready) + '</b>' +
+    (s.ready > 0 ? '<button class="lnk" id="clear-ready-btn" data-gb="' + gb(s.ready) + '" onclick="clearReady()" title="Your saved patches stay. The next replay just unpacks what it needs again.">Clear</button>' : '') + '</span>' +
+    '</div>';
+  $('p-meta').textContent = 'Kept in ' + s.path +
+    (apart > s.total * 1.2 ? ' · without sharing it would be ' + gb(apart) : '');
+}
+$('sbar').addEventListener('mouseover', e => {
+  const v = e.target.dataset && e.target.dataset.v;
+  document.querySelectorAll('#p-list .prow .cost').forEach(c => c.parentNode.classList.toggle('hl', !!v && c.dataset.v === v));
+});
+$('sbar').addEventListener('mouseleave', () => document.querySelectorAll('#p-list .prow.hl').forEach(r => r.classList.remove('hl')));
 // saved patches plus the ones kept ready. past this it says so, once you tell it to stop it stops
 const SPACE_WARN = 60 * 1024 ** 3;
 async function ignoreSpace() {
@@ -1700,6 +2029,38 @@ async function pickRepo() {
 }
 
 // settings
+function setSec(name) {
+  if (!$('s-' + name)) name = 'general';
+  document.querySelectorAll('#snav button').forEach(b => b.classList.toggle('on', b.dataset.s === name));
+  document.querySelectorAll('.sgrp').forEach(g => g.classList.toggle('on', g.id === 's-' + name));
+  try { localStorage.setItem('setSec', name); } catch (e) {}
+}
+function showSet(name) { if ($('s-srch').value) { $('s-srch').value = ''; srchSet(); } setSec(name); showTab('settings'); }
+// shows every section at once and hides the rows that don't match. tips count, people search for words in them
+function srchSet() {
+  const q = $('s-srch').value.trim().toLowerCase(), page = $('s-page');
+  page.classList.toggle('srch', !!q);
+  let any = false;
+  document.querySelectorAll('.sgrp').forEach(g => {
+    let hit = 0;
+    g.querySelectorAll('.opt').forEach(o => {
+      const txt = (o.textContent + ' ' + [...o.querySelectorAll('[data-tip],[title]')].map(x => x.dataset.tip || x.title).join(' ')).toLowerCase();
+      const ok = !q || txt.includes(q) || g.querySelector('h1').textContent.toLowerCase().includes(q);
+      o.classList.toggle('nohit', !ok); if (ok) hit++;
+    });
+    g.classList.toggle('nohit', !!q && !hit);
+    const b = document.querySelector('#snav button[data-s="' + g.id.slice(2) + '"]');
+    if (b) b.classList.toggle('none', !!q && !hit);
+    if (hit) any = true;
+  });
+  $('s-none').classList.toggle('on', !!q && !any);
+}
+$('snav').addEventListener('click', e => {
+  const b = e.target.closest('button[data-s]'); if (!b) return;
+  if ($('s-srch').value) { $('s-srch').value = ''; srchSet(); }
+  setSec(b.dataset.s);
+});
+try { setSec(localStorage.getItem('setSec') || 'general'); } catch (e) {}
 async function loadSettings() {
   try { config = { ...config, ...(await call('get_config')) }; } catch (e) {}
   $('me-inp').value = (config.player_names || []).join(', ');
@@ -1720,7 +2081,7 @@ async function loadSettings() {
   $('clear-exit').checked = !!config.clear_on_exit;
   $('save-new').checked = config.save_new_patches !== false;
   $('drive-sel').value = config.drive || '';
-  $('drive-sel').options[0].textContent = 'Storage drive: work it out' + (config.drive_found ? ' (' + config.drive_found + ')' : '');
+  $('drive-sel').options[0].textContent = 'Auto' + (config.drive_found ? ' (' + config.drive_found + ')' : '');
   loadCacheInfo();
   loadVanguard();
   loadUpdateInfo();
@@ -1820,7 +2181,8 @@ async function reportProblem() {
   } catch (e) { toast(e.message); }
 }
 async function clearReady() {
-  if (!await cfmDlg('Clear the ' + $('clear-ready-btn').dataset.gb + ' of ready to play files? Your saved patches stay, the next replay just builds what it needs again.', 'Clear', false)) return;
+  const b = $('clear-ready-btn');
+  if (!await cfmDlg('Clear the ' + (b ? b.dataset.gb : '') + ' of ready to play files? Your saved patches stay, the next replay just unpacks what it needs again.', 'Clear', false)) return;
   openCon('Clearing ready files');
   await call('clear_ready');
   loadP();
@@ -1829,7 +2191,7 @@ async function loadCacheInfo() {
   try {
     const c = await call('asset_cache');
     $('dd-info').innerHTML = c.files
-      ? c.files.toLocaleString() + ' files, ' + (c.bytes / 1048576).toFixed(1) + ' MB<br><span>Patches: ' + c.patches.map(esc).join(', ') + '</span>'
+      ? c.files.toLocaleString() + ' files, ' + (c.bytes / 1048576).toFixed(1) + ' MB<br><span>Patches: ' + [...new Set(c.patches.map(pv))].map(esc).join(', ') + '</span>'
       : 'Nothing cached. Icons load from the internet until downloaded.';
   } catch (e) { $('dd-info').textContent = ''; }
 }
@@ -1964,6 +2326,16 @@ async function whatsNew() {
   }).join('');
   $('wn-ov').classList.add('on');
 }
+
+// the click ring. one short-lived span per click, gone when its animation ends
+document.addEventListener('pointerdown', e => {
+  if (e.button !== 0 || !e.target.closest('button:not(:disabled), .row, .prow[data-i], .pyr, .plist > div, [onclick], .lnk')) return;
+  const t = document.createElement('span');
+  t.className = 'tap'; t.style.left = e.clientX + 'px'; t.style.top = e.clientY + 'px';
+  t.addEventListener('animationend', () => t.remove());
+  setTimeout(() => t.remove(), 800); // in case the animation never runs, a hidden window skips them
+  document.body.appendChild(t);
+}, { passive: true });
 
 init();
 </script>

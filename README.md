@@ -22,7 +22,7 @@
 </p>
 
 <p align="center">
-  <img src="images/demo.gif" alt="L-Recall in use">
+  <img src="images/demo-v1.1.0.gif" alt="L-Recall in use">
 </p>
 
 The native League client is only able to play ROFL files from the same patch (Not including hotfixes iirc...), which means older replays from patches yonks ago dont work anymore... which is where this tool comes in to help.
@@ -68,6 +68,42 @@ It works out whether your storage is on an NVMe SSD, a SATA SSD or a hard drive,
 The game files belong to Riot, so I can't share old patches, and please don't share your storage folder either.
 
 Logo is taken from League VCS, and edited to be a dark Amber; idk, to represent Zhonya's stasis for patches :D
+
+## Real numbers from my PC
+
+Measured on my own setup with L-Recall 1.1.0, after running it in the background for a few weeks.
+
+| | |
+|---|---|
+| Storage drive | Crucial P310 2 TB (NVMe SSD) |
+| CPU | AMD Ryzen 7 9800X3D (8 cores, 16 threads) |
+| RAM | 32 GB DDR5-6200 |
+| OS | Windows 11 Pro |
+
+**Storage**
+
+- 6 patches saved (26.18 to 26.22, plus 25.14), 9 builds counting hotfixes
+- They take **39.8 GB** together. Saved separately they'd be 151.7 GB, so sharing files saves about 3.8x
+- Each 26.x patch adds only 250 to 580 MB on top of the one before it. 25.14 is a few months older, so it adds 11 GB on its own
+- 242 replays across 24 patches, about 16 MB each
+
+**Timings**
+
+| What | Time |
+|---|---|
+| Reading all 242 replays when the app opens | 0.25 s |
+| Getting the newest patch ready in the background (4.1 GB) | 8.7 s |
+| Adding the 10 champions a replay needs on top of that (1.1 GB) | 4.8 s |
+| Watching another replay from a patch that's already ready | instant |
+| Clearing the ready files | 0.2 s |
+| Working out every patch's size from scratch | 16 s (shown straight away after the first time) |
+
+**Memory**
+
+- About 44 MB for L-Recall itself with the window open, plus the Windows web view the window runs in (Edge's helper processes, about 150 MB)
+- About 5 MB sitting in the tray with the window closed
+
+Your numbers will be different on a slower drive, and a hard drive will be a lot slower at getting patches ready.
 
 ## Need help?
 

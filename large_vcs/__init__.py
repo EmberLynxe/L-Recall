@@ -192,9 +192,14 @@ def _linkable(rel_path):
 
 
 def show(tag):
-    """what people see for a patch. 16.19.821.7343 is just 16.19, the build numbers are for us.
-    anything that isn't a league version comes through as is"""
-    return '.'.join(tag.split('.')[:2]) if re.fullmatch(r'\d+\.\d+\.\d+\.\d+', tag or '') else tag
+    """what people see for a patch. 16.19.821.7343 is just 26.19, the build numbers are for us.
+    riot went to year numbers in 2025, so game version 15.x is patch 25.x and 16.x is 26.x. older ones keep theirs.
+    anything that isn't a league version comes through as is. already-shown names come back the same"""
+    m = re.fullmatch(r'(\d+)\.(\d+)(?:\.\d+)*', tag or '')
+    if not m:
+        return tag
+    major = int(m.group(1))
+    return f'{major + 10 if 15 <= major <= 24 else major}.{m.group(2)}'
 
 
 def _is_wad_path(rel_path):
@@ -1637,11 +1642,13 @@ class LargeVCS:
 
     def patch_costs(self):
         """size per patch + how much deleting it actually frees"""
-        try:
-            os.unlink(self.repo_path('costs.cache.json'))  # this cache's old name
-        except OSError:
-            pass
-        return self._cached('patch-sizes', self._patch_costs)
+        # older names of this cache. patch-sizes still has 16.x group names in it from before the year names
+        for old in ('costs', 'patch-sizes'):
+            try:
+                os.unlink(self.repo_path(old + '.cache.json'))
+            except OSError:
+                pass
+        return self._cached('patch-sizes-2', self._patch_costs)
 
     def _patch_costs(self):
         tags = self.list()

@@ -301,13 +301,15 @@ class SettingsFrame(CallbackFrame):
             return
         report = repo.storage_report()
         used = repo.space_used()
+        disk = shutil.disk_usage(repo.files_dir)
         self._respond(req_id, {
             'path': self.config.get('repository'),
             'exists': True,
             'total': used['storage'],
             'ready': used['ready'],
             'used': used['total'],
-            'free': shutil.disk_usage(repo.files_dir).free,
+            'free': disk.free,
+            'disk': disk.total,
             'report': report,
             'needs_optimize': any(r['whole'] for r in report),
             'space_warning': self.config.get('space_warning', True),
@@ -326,6 +328,23 @@ class SettingsFrame(CallbackFrame):
             if version and not any(i['tag'] == version for i in out):
                 out.append({'tag': version, 'name': show(version), 'saved': version in stored})
         return out
+
+    _game_ver = (None, None)
+
+    def _handle_game_status(self, req_id, _msg):
+        """for the top bar. the process list is a cheap snapshot, the version only gets re-read when the exe changes"""
+        paths = self.config.get('game_paths') or []
+        exe = paths[0] if paths else core.detect_game_exe()
+        version = None
+        if exe:
+            try:
+                key = (exe, os.path.getmtime(exe))
+                if self._game_ver[0] != key:
+                    self._game_ver = (key, GameParser(exe).version)
+                version = self._game_ver[1]
+            except Exception:
+                pass
+        self._respond(req_id, {'running': winproc.game_running(), 'version': version})
 
     def _handle_save_status(self, req_id, _msg):
         self._respond(req_id, self._saver.save_status() if self._saver else None)
