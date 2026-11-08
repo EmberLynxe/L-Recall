@@ -102,10 +102,15 @@ class GUI:
         # normal, not above normal. the window being open shouldn't beat a game either
         self.set_priority(win32process.NORMAL_PRIORITY_CLASS)
 
-    def start(self, show_window=True):
+    def start(self, show_window=True, uninstall=False):
+        if uninstall and not self.config['configured']:
+            self.uninstall_unconfigured()
+            return
         if self.config['configured']:
             self.start_daemon()
-            if show_window:
+            if uninstall:
+                wx.CallAfter(self._open_uninstall)
+            elif show_window:
                 wx.CallAfter(self.open_settings)
         else:
             frame = InitialConfigFrame(self.config, on_complete=self._setup_done, on_cancel=self.exit)
@@ -162,6 +167,12 @@ class GUI:
         shortcut.WorkingDirectory = wDir
         shortcut.IconLocation = sys.executable
         shortcut.save()
+        # start menu and settings > apps. without them L-Recall never turns up in windows search
+        try:
+            from league_vcs import appentry
+            appentry.register(target, shell)
+        except Exception as e:
+            print(f"Couldn't add L-Recall to the Start menu ({e}).")
 
     def update_tray_menu(self):
         # (label, action, icon, highlighted). no action = greyed out
@@ -298,6 +309,25 @@ class GUI:
         """any thread"""
         if self.config['configured']:
             wx.CallAfter(self.open_settings)
+
+    def show_uninstall(self):
+        """any thread. windows' uninstall button lands here, it opens the window on our uninstall"""
+        if self.config['configured']:
+            wx.CallAfter(self._open_uninstall)
+
+    def _open_uninstall(self):
+        self.open_settings()
+        if self.settings_frame:
+            self.settings_frame.request_uninstall()
+
+    def uninstall_unconfigured(self):
+        """never got past setup, so there's no window to send them to. ask here and do it"""
+        from league_vcs import uninstall
+        if wx.MessageBox('Uninstall L-Recall? It was never set up, so this just removes the program.',
+                         'L-Recall', style=wx.YES_NO | wx.ICON_QUESTION) != wx.YES:
+            return
+        uninstall.remove_data()
+        uninstall.schedule_program_removal(os.path.dirname(sys.executable))
 
     def open_settings(self, *_):
         if self.settings_frame:

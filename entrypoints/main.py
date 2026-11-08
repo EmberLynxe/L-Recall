@@ -118,15 +118,18 @@ if __name__ == '__main__':
     replay_args = [a for a in sys.argv[1:] if not a.startswith('--')]
     if not replay_args:
         singleton = Singleton()
+        uninstalling = '--uninstall' in sys.argv  # windows' uninstall button in settings > apps
         if singleton.should_close():
-            if '--background' not in sys.argv:
+            if uninstalling:
+                singleton.notify_existing(uninstall=True)
+            elif '--background' not in sys.argv:
                 singleton.notify_existing()
             print('Already running; asked it to show its window.')
             sys.exit(0)
 
         gui = GUI(config)
-        singleton.listen(lambda: gui.show_window())
-        gui.start(show_window='--background' not in sys.argv)
+        singleton.listen(lambda: gui.show_window(), on_uninstall=lambda: gui.show_uninstall())
+        gui.start(show_window='--background' not in sys.argv, uninstall=uninstalling)
     else:
         gui = GUI(config)
         gui.watch(replay_args[0])

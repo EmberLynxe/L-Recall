@@ -1013,7 +1013,7 @@ async function init() {
     const info = await call('init');
     config = info.config || {};
     if (!info.configured) { $('setup-view').classList.add('on'); detectSuGame(); }
-    else showApp();
+    else { await showApp(); if (info.open === 'uninstall') openUninstall(); }
   } catch (e) {
     document.body.innerHTML = '<div style="padding:24px;color:#e3545e;font:13px Consolas,monospace">Couldn\'t start: ' + esc(e.message) + '</div>';
   }
@@ -2221,6 +2221,14 @@ async function loadUninstallInfo() {
     $('un-patches').disabled = !u.patch_bytes;
     if (!u.patch_bytes) $('un-patches').checked = false;
   } catch (e) { $('un-info').textContent = ''; }
+}
+// from windows' uninstall button: the uninstall bit of settings, then the usual question
+async function openUninstall() {
+  showSet('app');
+  await loadUninstallInfo();
+  const b = document.querySelector('#s-app .btn.danger');
+  if (b) b.scrollIntoView({ block: 'center' });
+  uninstallApp();
 }
 async function uninstallApp() {
   const patches = $('un-patches').checked;

@@ -2,7 +2,7 @@
   <img src="raster/icon.png" width="128" alt="L-Recall logo">
 </p>
 
-<h1 align="center">L-Recall</h1>
+<h1 align="center">L-Recall <sub>v1.1.0</sub></h1>
 
 <p align="center">A tool that sorts your old Client Patches, and the means to watch older ROFL/Game Replays.</p>
 

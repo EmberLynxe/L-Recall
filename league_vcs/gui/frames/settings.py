@@ -64,6 +64,8 @@ class SettingsFrame(CallbackFrame):
         self._busy = False
         self._cancel = None
         self._op_lock = threading.Lock()  # one console job at a time
+        self._page_ready = False
+        self._want_uninstall = False
         self._asks = {}
         self.Bind(wx.EVT_CLOSE, self._on_close)
         self._quit_app = quit_app
@@ -188,10 +190,19 @@ class SettingsFrame(CallbackFrame):
     # handlers
 
     def _handle_init(self, req_id, _msg):
+        want, self._want_uninstall, self._page_ready = self._want_uninstall, False, True
         self._respond(req_id, {
             'configured': bool(self.config.get('configured')),
             'config': dict(self.config),
+            'open': 'uninstall' if want else '',
         })
+
+    def request_uninstall(self):
+        """main thread. straight to the page if it's up, otherwise it asks for it when it loads"""
+        if self._page_ready:
+            self._exec('openUninstall()')
+        else:
+            self._want_uninstall = True
 
     def _handle_get_config(self, req_id, _msg):
         paths_info = []

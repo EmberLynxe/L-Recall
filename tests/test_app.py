@@ -458,11 +458,11 @@ class UninstallTest(TempDirTest):
         os.makedirs(os.path.join(self.tmp, 'lib', 'league_vcs'))
         os.makedirs(os.path.join(self.tmp, 'logs'))
         open(os.path.join(self.tmp, 'logs', '2026-09-27T10-00-00-000000.log'), 'w').close()
-        self.assertEqual(uninstall._shipped(self.tmp)[0], ['lib', 'logs'])
+        self.assertEqual(uninstall.shipped(self.tmp)[0], ['lib', 'logs'])
         # someone's own logs folder in Downloads, and a lib that isn't ours
         open(os.path.join(self.tmp, 'logs', 'my notes.txt'), 'w').close()
         os.makedirs(os.path.join(self.tmp, 'lib.old'))
-        self.assertEqual(uninstall._shipped(self.tmp)[0], ['lib'])
+        self.assertEqual(uninstall.shipped(self.tmp)[0], ['lib'])
 
 
 class ReportTest(TempDirTest):

@@ -30,7 +30,7 @@ def _ours(app_dir, folder):
         return False
 
 
-def _shipped(app_dir):
+def shipped(app_dir):
     """(folders, files) cx_freeze puts next to the exe, plus what we write there ourselves"""
     py = f'python{sys.version_info.major}{sys.version_info.minor}.dll'
     folders = [f for f in ('lib', 'lib.old', 'logs') if _ours(app_dir, f)]
@@ -47,6 +47,8 @@ def stored_patch_bytes(repository):
 
 def remove_data(repository=None, delete_patches=False, log=print):
     """everything except the program files. safe to run from source"""
+    from . import appentry
+    appentry.unregister(log)
     for name in STARTUP_NAMES:
         path = os.path.join(_startup_folder(), name)
         if os.path.exists(path):
@@ -94,7 +96,7 @@ def schedule_program_removal(app_dir):
     """start the cleanup script. returns False when running from source, there's nothing to remove"""
     if not getattr(sys, 'frozen', False):
         return False
-    folders, files = _shipped(app_dir)
+    folders, files = shipped(app_dir)
     script = _SCRIPT.format(
         folders='\n'.join(f'rmdir /s /q "%LRECALL_DIR%\\{f}" >nul 2>&1' for f in folders),
         files='\n'.join(f'del /f /q "%LRECALL_DIR%\\{f}" >nul 2>&1' for f in files))
