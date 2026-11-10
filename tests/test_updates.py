@@ -67,6 +67,18 @@ class UpdateTest(unittest.TestCase):
             r = updates._fetch_latest()
         self.assertEqual((r['zip'], r['sha256'], r['size']), (ours, ours + '.sha256', 5))
 
+    def test_after_moving_to_catknip(self):
+        base = 'https://github.com/CatKnip0/L-Recall/releases/'
+        zip_url = base + 'download/v2.0.0/L-Recall-v2.0.0-win64.zip'
+        body = json.dumps({'tag_name': 'v2.0.0', 'html_url': base + 'tag/v2.0.0', 'assets': [
+            {'browser_download_url': zip_url, 'size': 5},
+            {'browser_download_url': zip_url + '.sha256'},
+            {'browser_download_url': 'https://github.com/CatKnip0/Other/releases/download/v2.0.0/x-win64.zip'}]}).encode()
+        fake = mock.MagicMock(__enter__=lambda s: mock.MagicMock(read=lambda: body))
+        with mock.patch('urllib.request.urlopen', return_value=fake):
+            r = updates._fetch_latest()
+        self.assertEqual((r['url'], r['zip'], r['sha256']), (base + 'tag/v2.0.0', zip_url, zip_url + '.sha256'))
+
 
 class FakeConfig(dict):
     def save(self):

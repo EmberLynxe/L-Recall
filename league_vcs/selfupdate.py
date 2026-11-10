@@ -20,7 +20,7 @@ def can_update():
 
 
 def _open(url, timeout=30):
-    if not url or not url.startswith(updates.DOWNLOADS_URL):
+    if not updates.is_our_download(url):
         raise ValueError("That release doesn't have a download L-Recall can use.")
     return urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'l-recall'}), timeout=timeout)
 

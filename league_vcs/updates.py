@@ -11,6 +11,15 @@ REPO = 'EmberLynxe/L-Recall'
 RELEASES_URL = f'https://github.com/{REPO}/releases'
 DOWNLOADS_URL = f'{RELEASES_URL}/download/'
 _API = f'https://api.github.com/repos/{REPO}/releases/latest'
+# the repo might move to CatKnip0. github redirects the api call, but the links that come back
+# say the new owner, so both count as ours
+_OWNERS = ('EmberLynxe', 'CatKnip0')
+_RELEASES = tuple(f'https://github.com/{o}/L-Recall/releases/' for o in _OWNERS)
+_DOWNLOADS = tuple(f'{r}download/' for r in _RELEASES)
+
+
+def is_our_download(url):
+    return isinstance(url, str) and url.startswith(_DOWNLOADS)
 _CACHE_SECONDS = 60 * 60
 
 _lock = threading.Lock()
@@ -36,14 +45,14 @@ def _fetch_latest(timeout=10):
         return None
     # only ever open our own releases page
     url = data.get('html_url') or ''
-    if not isinstance(url, str) or not url.startswith(RELEASES_URL + '/'):
+    if not isinstance(url, str) or not url.startswith(_RELEASES):
         url = RELEASES_URL
     # the zip and its hash, for updating in place. same deal, has to come from our own releases
     zip_url = sha_url = None
     size = 0
     for asset in data.get('assets') or []:
         link = asset.get('browser_download_url') or ''
-        if not isinstance(link, str) or not link.startswith(DOWNLOADS_URL):
+        if not is_our_download(link):
             continue
         if link.endswith('-win64.zip'):
             zip_url, size = link, asset.get('size') or 0
