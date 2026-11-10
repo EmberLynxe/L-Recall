@@ -557,6 +557,7 @@ class SettingsFrame(CallbackFrame):
         release = updates.newer_than_running(force) if (enabled or force) else None
         latest = updates.latest() if (enabled or force) else None
         self._respond(req_id, {'current': __version__, 'update': release, 'enabled': enabled,
+                               'auto_install': self.config.get('auto_install', True),
                                'latest': latest['version'] if latest else None,
                                'can_install': bool(selfupdate.can_update() and release and release.get('zip')),
                                'dismissed': self.config.get('dismissed_update', '')})
@@ -571,23 +572,7 @@ class SettingsFrame(CallbackFrame):
         if not release:
             print('Already on the newest version.')
             return
-        print(f"Downloading L-Recall {release['version']}...")
-        new = selfupdate.download(release)
-        print('Download matches its published hash.')
-        self.config['whats_new'] = {'version': release['version'], 'notes': release.get('notes') or ''}
-        self.config.save()
-        repo = self._repo_or_none()
-        if repo:
-            # a patch getting stored right now finishes first. the lock is never let go on purpose,
-            # it goes when we exit so nothing new starts in the meantime
-            print('Waiting for patch storage to be idle...')
-            repo.lock.__enter__()
-        try:
-            selfupdate.apply(new, os.path.dirname(sys.executable))
-        except BaseException:
-            if repo:
-                repo.lock.__exit__(None, None, None)  # not closing after all, so storage has to keep working
-            raise
+        selfupdate.install(release, self.config, self._repo_or_none())
         print('L-Recall will close and open again on the new version in a few seconds.')
         if self._quit_app:
             # this runs on the worker thread and wx timers can only start on the main one. it used to
@@ -604,6 +589,11 @@ class SettingsFrame(CallbackFrame):
 
     def _handle_set_check_updates(self, req_id, msg):
         self.config['check_updates'] = bool(msg.get('on'))
+        self.config.save()
+        self._respond(req_id, True)
+
+    def _handle_set_auto_install(self, req_id, msg):
+        self.config['auto_install'] = bool(msg.get('on'))
         self.config.save()
         self._respond(req_id, True)
 

@@ -743,6 +743,10 @@ tr.me .pl-n { color: var(--accent); }
             <input type="checkbox" class="sw" id="upd-auto" onchange="updAuto(this.checked)">
           </div>
           <div class="opt">
+            <div><h3>Install updates by itself</h3><p>Only while the window's closed and you're not in a game. You get a popup after.</p></div>
+            <input type="checkbox" class="sw" id="upd-self" onchange="updSelf(this.checked)">
+          </div>
+          <div class="opt">
             <div><h3>Problem report</h3><p>Something broken? Zips your recent logs into Downloads, with your username taken out, so you can send them to whoever's helping.</p></div>
             <button class="btn" onclick="reportProblem()">Save report</button>
           </div>
@@ -2132,6 +2136,7 @@ async function loadUpdateInfo() {
   $('upd-get').style.display = updInfo ? '' : 'none';
   $('upd-get-gh').style.display = updInfo && updCanInstall ? '' : 'none';
   $('upd-auto').checked = !res || res.enabled !== false;
+  $('upd-self').checked = !res || res.auto_install !== false;
 }
 async function updCheckNow() {
   $('upd-info').textContent = 'Checking...';
@@ -2154,6 +2159,7 @@ async function updLater() {
   if (updInfo) await call('dismiss_update', { version: updInfo.version });
 }
 async function updAuto(on) { await call('set_check_updates', { on }); }
+async function updSelf(on) { await call('set_auto_install', { on }); }
 
 async function checkStorage() {
   openCon('Checking storage');

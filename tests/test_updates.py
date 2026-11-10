@@ -158,6 +158,26 @@ class SelfUpdateTest(unittest.TestCase):
         with self.serve(files), self.assertRaises(ValueError):
             selfupdate.download(release)
 
+    def test_background_install_comes_back_to_the_tray(self):
+        release, files = self.release(self.make_zip(['L-Recall.exe']))
+        release['version'] = '9.0.0'
+        cfg = FakeConfig()
+        with self.serve(files), mock.patch.object(selfupdate, 'apply') as apply:
+            self.assertTrue(selfupdate.install(release, cfg, background=True, log=lambda *a: None))
+        self.assertTrue(apply.call_args.kwargs['background'])
+        self.assertEqual((cfg['updated_quietly'], cfg['whats_new']['version']), ('9.0.0', '9.0.0'))
+        self.assertIn('%LRECALL_ARGS%', selfupdate._SCRIPT)
+
+    def test_window_opened_during_download_backs_off(self):
+        release, files = self.release(self.make_zip(['L-Recall.exe']))
+        release['version'] = '9.0.0'
+        cfg = FakeConfig()
+        with self.serve(files), mock.patch.object(selfupdate, 'apply') as apply:
+            self.assertFalse(selfupdate.install(release, cfg, background=True, ready=lambda: False,
+                                                log=lambda *a: None))
+        apply.assert_not_called()
+        self.assertEqual(cfg, {})
+
     def test_only_our_downloads(self):
         with self.assertRaises(ValueError):
             selfupdate.download({'zip': 'https://evil.example/x.zip', 'sha256': 'https://evil.example/x.sha256'})

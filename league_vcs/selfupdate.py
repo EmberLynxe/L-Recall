@@ -93,20 +93,49 @@ move /y "%LRECALL_DIR%\lib.old" "%LRECALL_DIR%\lib" >nul
 del /f /q "%LRECALL_DIR%\L-Recall.exe" >nul 2>&1
 move /y "%LRECALL_DIR%\L-Recall.exe.old" "%LRECALL_DIR%\L-Recall.exe" >nul
 :start
-start "" "%LRECALL_DIR%\L-Recall.exe"
+start "" "%LRECALL_DIR%\L-Recall.exe" %LRECALL_ARGS%
 :end
 rmdir /s /q "%LRECALL_WORK%" >nul 2>&1
 (goto) 2>nul & del "%~f0"
 '''
 
 
-def apply(new, app_dir, pid=None):
+def install(release, config, repo=None, background=False, ready=None, log=print):
+    """download, check, and start the swap. True means quit now. ready() gets asked once the download's
+    done, a False there throws the download away and nothing changes"""
+    log(f"Downloading L-Recall {release['version']}...")
+    new = download(release)
+    log('Download matches its published hash.')
+    if ready and not ready():
+        shutil.rmtree(os.path.dirname(new), ignore_errors=True)
+        return False
+    config['whats_new'] = {'version': release['version'], 'notes': release.get('notes') or ''}
+    if background:
+        config['updated_quietly'] = release['version']
+    config.save()
+    if repo:
+        # a patch getting stored right now finishes first. the lock is never let go on purpose,
+        # it goes when we exit so nothing new starts in the meantime
+        log('Waiting for patch storage to be idle...')
+        repo.lock.__enter__()
+    try:
+        apply(new, os.path.dirname(sys.executable), background=background)
+    except BaseException:
+        if repo:
+            repo.lock.__exit__(None, None, None)  # not closing after all, so storage has to keep working
+        raise
+    return True
+
+
+def apply(new, app_dir, pid=None, background=False):
     """start the swap script. it waits for this process to exit, so quit right after"""
     fd, script = tempfile.mkstemp(prefix='l-recall-update-', suffix='.cmd')
     with os.fdopen(fd, 'w', encoding='ascii') as f:
         f.write(_SCRIPT.replace('\n', '\r\n'))
     # paths go in through env vars, same reason as uninstall. % and & in folder names break cmd
     env = {**os.environ, 'LRECALL_DIR': os.path.abspath(app_dir), 'LRECALL_NEW': os.path.abspath(new),
-           'LRECALL_WORK': os.path.dirname(os.path.abspath(new)), 'LRECALL_PID': str(pid or os.getpid())}
+           'LRECALL_WORK': os.path.dirname(os.path.abspath(new)), 'LRECALL_PID': str(pid or os.getpid()),
+           # comes back the way it was: straight to the tray if nobody had the window open
+           'LRECALL_ARGS': '--background' if background else ''}
     subprocess.Popen(f'cmd.exe /d /s /c ""{script}""', env=env, close_fds=True, cwd=tempfile.gettempdir(),
                      creationflags=subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP)

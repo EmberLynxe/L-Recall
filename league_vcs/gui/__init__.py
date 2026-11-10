@@ -37,7 +37,7 @@ import wx
 
 from .frames import WatchReplayFrame, InitialConfigFrame, SettingsFrame
 from .tray_item import TrayItem
-from .. import __version__, core, updates, winproc
+from .. import __version__, core, selfupdate, updates, winproc
 from ..config import Config
 from ..exceptions import UserInputException
 from large_vcs import show
@@ -67,6 +67,7 @@ class GUI:
         self.update_interval: Optional[wx.CallLater] = None
         self.update_info = None
         self._told_about = None
+        self._auto_retry = False
         self.tray_icon: Optional[TrayItem] = None
 
         self.scan_lock = threading.Lock()
@@ -143,6 +144,7 @@ class GUI:
         self.set_low_priority()
         self.tray_icon = TrayItem([], on_click=self.open_settings, subtitle=f'v{__version__}', status=self.tray_status)
         self.update_tray_menu()
+        self._say_updated()
         self.auto_scan_loop()
         self.update_check_loop()
 
@@ -221,14 +223,57 @@ class GUI:
         release = updates.newer_than_running()
         self.update_info = release
         wx.CallAfter(self.update_tray_menu)
+        if release and self._auto_install(release):
+            return
         # one balloon per version, none for a version they already said no to, and none mid-game.
-        # the tray menu still has it, and the next check can say it
+        # the tray menu still has it, and the next check can say it. still says it when it's going to
+        # install by itself later, they might want it sooner
         if release and release['version'] not in (self._told_about, self.config.get('dismissed_update')) \
                 and not winproc.game_running():
             self._told_about = release['version']
+            later = ' Or leave it, it updates itself once you\'re not using it.' if self._auto_retry else ''
             wx.CallAfter(self.tray_icon.ShowBalloon,
                          title=f"L-Recall {release['version']} is out",
-                         text='Open L-Recall and hit Update now.')
+                         text='Open L-Recall and hit Update now.' + later)
+
+    AUTO_RETRY = 20 * 60 * 1000
+
+    def _idle(self):
+        """nobody would notice l-recall restarting. window shut, no game, nothing being stored"""
+        return not (self.settings_frame or self.replay_frame or self.saving or self.scan_lock.locked()
+                    or winproc.game_running())
+
+    def _auto_install(self, release):
+        """update in the background if that's on. True means it's installing and we're about to quit.
+        False means tell them as usual, and if it's on but we're busy it comes back to it later"""
+        if not (getattr(sys, 'frozen', False) and release.get('zip') and self.config.get('auto_install', True)):
+            return False
+        try:
+            # the download can take a minute, they might have opened the window meanwhile
+            if self._idle() and selfupdate.install(release, self.config, core.repo, background=True,
+                                                   ready=self._idle):
+                wx.CallAfter(self.exit)
+                return True
+        except Exception as e:
+            print(f"Couldn't update in the background ({e}).")
+            return False
+        # someone's using it, or playing. try again in a bit rather than in 12 hours. only one of these
+        # waiting at a time, the 12 hour check would stack another one each time otherwise
+        if not self._auto_retry:
+            self._auto_retry = True
+            wx.CallAfter(wx.CallLater, self.AUTO_RETRY, self._retry_auto_install)
+        return False
+
+    def _retry_auto_install(self):
+        self._auto_retry = False
+        threading.Thread(target=self._check_for_update, daemon=True).start()
+
+    def _say_updated(self):
+        """first start after a background update. otherwise nobody would know it happened"""
+        if self.config.get('updated_quietly') == __version__:
+            self.config['updated_quietly'] = None
+            self.config.save()
+            self.notify(f'L-Recall updated to {__version__}', 'Open it to see what changed.')
 
     def notify(self, title, text):
         """tray popup, any thread"""
